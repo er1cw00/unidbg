@@ -275,7 +275,7 @@ public final class ElfFile {
 		encoding = ident[5];
 		if (!(encoding == DATA_LSB || encoding == DATA_MSB)) throw new ElfException("Invalid encoding: " + encoding);
 		int elfVersion = ident[6];
-		if (elfVersion != 1) throw new ElfException("Invalid elf version: " + elfVersion);
+		//if (elfVersion != 1) throw new ElfException("Invalid elf version: " + elfVersion);
 		// ident[7]; // EI_OSABI, target operating system ABI
 		// ident[8]; // EI_ABIVERSION, ABI version. Linux kernel (after at least 2.6) has no definition of it.
 		// ident[9-15] // EI_PAD, currently unused.
