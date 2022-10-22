@@ -17,3 +17,11 @@
 *.idb
 /unidbg-ios/src/test/resources/native/swift/swift_library.o
 /unidbg-ios/src/test/resources/native/swift/swift_library-Swift.h
+.gradle
+backend/dynarmic/build
+backend/hypervisor/build
+backend/kvm/build
+backend/unicorn2/build
+buildSrc/build
+unidbg-android/build
+unidbg-api/build
