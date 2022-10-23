@@ -34,16 +34,19 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 public class ArmLD64 extends Dlfcn {
 
     private static final Log log = LogFactory.getLog(ArmLD64.class);
 
     private final Backend backend;
+    private long executorHandle;
 
     ArmLD64(Backend backend, SvcMemory svcMemory) {
         super(svcMemory);
         this.backend = backend;
+        this.executorHandle = 0;
     }
 
     @Override
@@ -232,7 +235,12 @@ public class ArmLD64 extends Dlfcn {
                             if (log.isDebugEnabled()) {
                                 log.debug("dlopen filename=" + filename.getString(0) + ", flags=" + flags + ", LR=" + context.getLRPointer());
                             }
-                            return dlopen(emulator.getMemory(), filename.getString(0), emulator);
+                            String soname = "";
+                            if (filename != null) {
+                                soname = filename.getString(0);
+                                log.warn("filename is null");
+                            }
+                            return dlopen(emulator.getMemory(), soname, emulator);
                         }
                     }).peer;
                 case "dladdr":
@@ -291,9 +299,22 @@ public class ArmLD64 extends Dlfcn {
         }
         return 0;
     }
-
+    protected final long dlsym(Emulator<?> emulator, long handle, String symbolName) {
+        if (handle == executorHandle && executorHandle != 0) {
+            log.warn("dlsym: " + symbolName);
+        }
+        return super.dlsym(emulator, handle, symbolName);
+    }
     private long dlopen(Memory memory, String filename, Emulator<?> emulator) {
         UnidbgPointer pointer = UnidbgPointer.register(emulator, Arm64Const.UC_ARM64_REG_SP);
+        if (filename.isEmpty()) {
+            if (executorHandle == 0) {
+                Random r = new Random();
+                executorHandle = r.nextLong() | 0x01;
+                log.info("Executor Handle: "+ Long.toHexString(executorHandle));
+            }
+            return executorHandle;
+        }
         try {
             Module module = memory.dlopen(filename, false);
             pointer = pointer.share(-8, 0); // return value

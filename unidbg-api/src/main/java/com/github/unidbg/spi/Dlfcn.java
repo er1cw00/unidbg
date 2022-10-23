@@ -24,7 +24,7 @@ public abstract class Dlfcn implements HookListener, Serializable {
         error.setMemory(0, 0x80, (byte) 0);
     }
 
-    protected final long dlsym(Emulator<?> emulator, long handle, String symbolName) {
+    protected long dlsym(Emulator<?> emulator, long handle, String symbolName) {
         Memory memory = emulator.getMemory();
         Symbol symbol = memory.dlsym(handle, symbolName);
         if (symbol == null) {
