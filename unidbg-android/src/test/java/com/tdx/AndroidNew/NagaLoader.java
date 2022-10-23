@@ -20,11 +20,17 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
 import unicorn.Unicorn;
 import com.github.unidbg.arm.backend.UnHook;
@@ -42,10 +48,12 @@ public class NagaLoader {
     private final String libPath = "/Users/wadahana/Desktop/tdx/libxloader.so";
 //    private final String libPath = "/Users/wadahana/Desktop/tdx/xloader/xloader.so";
     public static void main(String[] args) {
-        NagaLoader xloader = new NagaLoader(true);
-        //xloader.load();
-        //xloader.destroy();
+        NagaLoader loader = new NagaLoader(true);
+        //loader.load();
+        //loader.destroy();
     }
+    Map<Long, Integer> runAddrs = new TreeMap<Long, Integer>();
+
     NagaLoader(boolean logging) {
         this.logging = logging;
 //        Logger.getLogger("com.github.unidbg.linux.ModuleSymbol").setLevel(Level.DEBUG);
@@ -59,7 +67,7 @@ public class NagaLoader {
                 .build(); // 创建模拟器实例，要模拟32位或者64位，在这里区分
 
         final Memory memory = emulator.getMemory(); // 模拟器的内存操作接口
-        long baseAddr = memory.MMAP_BASE;
+        final long baseAddr = memory.MMAP_BASE;
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         //initRootfs();
 
@@ -68,7 +76,14 @@ public class NagaLoader {
             @Override
             public void hook(Backend backend, long address, int size, Object user) {
                 //打印当前地址。这里要把unidbg使用的基址给去掉。
-                //System.out.println(String.format("0x%x",address-baseAddr));
+                System.out.println(String.format("0x%x",address-baseAddr));
+                long offset = address-baseAddr;
+                Integer value = runAddrs.get(offset);
+                if (value == null) {
+                    runAddrs.put(offset, 1);
+                } else {
+                    runAddrs.put(offset, value + 1);
+                }
             }
             @Override
             public void onAttach(UnHook unHook) {
@@ -102,6 +117,7 @@ public class NagaLoader {
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
         System.out.println("module base:" + Long.toHexString(module.base));
         //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
+        saveRunAddress(runAddrs);
     }
     private void destroy() {
         try {
@@ -114,6 +130,23 @@ public class NagaLoader {
             System.out.printf("exception:\n" + e);
         }
         System.out.println("emulator destroy...");
+    }
+    private void saveRunAddress(Map<Long, Integer> runAddrs) {
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir+"/offset.txt");
+        try {
+            file.createNewFile();
+            FileWriter writer =new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            for(Long offset : runAddrs.keySet()) {
+                bufferedWriter.write("0x"+Long.toHexString(offset)+"\r\n");
+            }
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
+        }
+        System.out.println("write run offset to " + file.getAbsoluteFile());
     }
     private void createSymLink(String dest, String symName) throws IOException {
         Path destFilePath = Paths.get(dest);
