@@ -307,17 +307,21 @@ public class ArmLD64 extends Dlfcn {
     }
     private long dlopen(Memory memory, String filename, Emulator<?> emulator) {
         UnidbgPointer pointer = UnidbgPointer.register(emulator, Arm64Const.UC_ARM64_REG_SP);
-        if (filename.isEmpty()) {
-            if (executorHandle == 0) {
-                Random r = new Random();
-                executorHandle = r.nextLong() | 0x01;
-                log.info("Executor Handle: "+ Long.toHexString(executorHandle));
-            }
-            return executorHandle;
-        }
+
         try {
-            Module module = memory.dlopen(filename, false);
             pointer = pointer.share(-8, 0); // return value
+            if (filename.isEmpty()) {
+                if (executorHandle == 0) {
+                    Random r = new Random();
+                    executorHandle = r.nextLong() | 0x01;
+                    log.info("Executor Handle: "+ Long.toHexString(executorHandle));
+                }
+                pointer.setLong(0, executorHandle);
+                pointer = pointer.share(-8, 0); // NULL-terminated
+                pointer.setLong(0, 0);
+                return executorHandle;
+            }
+            Module module = memory.dlopen(filename, false);
             if (module == null) {
                 pointer.setLong(0, 0);
 
