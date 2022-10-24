@@ -3,6 +3,7 @@ package com.tdx.AndroidNew;
 import com.github.unidbg.AndroidEmulator;
 import com.github.unidbg.Module;
 import com.github.unidbg.arm.backend.Backend;
+import com.github.unidbg.arm.backend.BlockHook;
 import com.github.unidbg.arm.backend.CodeHook;
 
 import com.github.unidbg.arm.backend.DynarmicFactory;
@@ -28,10 +29,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import capstone.Capstone;
+import jdk.internal.net.http.common.Pair;
 import unicorn.Unicorn;
 import com.github.unidbg.arm.backend.UnHook;
 
@@ -47,12 +52,16 @@ public class NagaLoader {
     private final String rootDir = "/Users/wadahana/Desktop/tdx/rootfs";
     private final String libPath = "/Users/wadahana/Desktop/tdx/libxloader.so";
 //    private final String libPath = "/Users/wadahana/Desktop/tdx/xloader/xloader.so";
+
+    private Map<Long, Integer> addrMap = new TreeMap<Long, Integer>();
+    private List<Pair<Long, Capstone.CsInsn[]>> blockList =new ArrayList<Pair<Long, Capstone.CsInsn[]>>();
+
     public static void main(String[] args) {
         NagaLoader loader = new NagaLoader(true);
         //loader.load();
         //loader.destroy();
     }
-    Map<Long, Integer> runAddrs = new TreeMap<Long, Integer>();
+
 
     NagaLoader(boolean logging) {
         this.logging = logging;
@@ -70,19 +79,39 @@ public class NagaLoader {
         final long baseAddr = memory.MMAP_BASE;
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         //initRootfs();
+        trackInstrument();
 
+
+
+//        debugger = emulator.attach(DebuggerType.ANDROID_SERVER_V7);
+//        debugger = emulator.attach(DebuggerType.CONSOLE);
+//        debugger.addBreakPoint(baseAddr + 0x7E90);
+//        debugger.addBreakPoint(baseAddr + 0x30DFC);
+
+        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
+
+        vm = emulator.createDalvikVM(); // 创建Android虚拟机
+        vm.setVerbose(logging); // 设置是否打印Jni调用细节
+        DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
+        module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
+        System.out.println("module base:" + Long.toHexString(module.base));
+        //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
+        //saveAddrMap(runAddrs);
+    }
+    private void trackInstrument(long baseAddr, long start, long end) {
+        addrMap.clear();
         emulator.getBackend().hook_add_new(new CodeHook() {
             private UnHook unHook;
             @Override
             public void hook(Backend backend, long address, int size, Object user) {
                 //打印当前地址。这里要把unidbg使用的基址给去掉。
-                System.out.println(String.format("0x%x",address-baseAddr));
-                long offset = address-baseAddr;
-                Integer value = runAddrs.get(offset);
+                //System.out.println(String.format("0x%x",address-baseAddr));
+                long offset = address - baseAddr;
+                Integer value = addrMap.get(offset);
                 if (value == null) {
-                    runAddrs.put(offset, 1);
+                    addrMap.put(offset, 1);
                 } else {
-                    runAddrs.put(offset, value + 1);
+                    addrMap.put(offset, value + 1);
                 }
             }
             @Override
@@ -101,23 +130,18 @@ public class NagaLoader {
                 }
                 System.out.println("detach");
             }
-        },baseAddr,baseAddr+0x2063FF,null);
+        },baseAddr+start,baseAddr+end,null);
+//        },baseAddr,baseAddr + 0x2063FF,null);
 //        },0x4003CFB8,0x4003D450,null);
-
-//        debugger = emulator.attach(DebuggerType.ANDROID_SERVER_V7);
-//        debugger = emulator.attach(DebuggerType.CONSOLE);
-//        debugger.addBreakPoint(baseAddr + 0x7E90);
-//        debugger.addBreakPoint(baseAddr + 0x30DFC);
-
-        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
-
-        vm = emulator.createDalvikVM(); // 创建Android虚拟机
-        vm.setVerbose(logging); // 设置是否打印Jni调用细节
-        DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
-        module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
-        System.out.println("module base:" + Long.toHexString(module.base));
-        //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-        saveRunAddress(runAddrs);
+    }
+    private void trackBlock(long baseAddr, long start, long end) {
+        emulator.getBackend().hook_add_new(new BlockHook() {
+            @Override
+            public void hookBlock(Backend backend, long address, int size, Object user) {
+                Capstone.CsInsn[] insns = emulator.disassemble(address, size,0);
+                blockList.add(new Pair<Long, Capstone.CsInsn[]>(address,insns));
+            }
+        }, baseAddr + start,baseAddr + end,null););
     }
     private void destroy() {
         try {
@@ -131,14 +155,14 @@ public class NagaLoader {
         }
         System.out.println("emulator destroy...");
     }
-    private void saveRunAddress(Map<Long, Integer> runAddrs) {
+    private void saveAddrMap(Map<Long, Integer> addrMap) {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
         File file = new File(rootDir+"/offset.txt");
         try {
             file.createNewFile();
             FileWriter writer =new FileWriter(file.getAbsoluteFile());
             BufferedWriter bufferedWriter = new BufferedWriter(writer);
-            for(Long offset : runAddrs.keySet()) {
+            for(Long offset : addrMap.keySet()) {
                 bufferedWriter.write("0x"+Long.toHexString(offset)+"\r\n");
             }
             bufferedWriter.close();
@@ -148,6 +172,7 @@ public class NagaLoader {
         }
         System.out.println("write run offset to " + file.getAbsoluteFile());
     }
+
     private void createSymLink(String dest, String symName) throws IOException {
         Path destFilePath = Paths.get(dest);
         Path symLinkPath = Paths.get(symName);
