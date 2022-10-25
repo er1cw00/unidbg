@@ -28,10 +28,11 @@ public abstract class Dlfcn implements HookListener, Serializable {
         Memory memory = emulator.getMemory();
         Symbol symbol = memory.dlsym(handle, symbolName);
         if (symbol == null) {
-            log.info("Find symbol \"" + symbolName + "\" failed: handle=0x" + Long.toHexString(handle) + ", LR=" + emulator.getContext().getLRPointer());
+        //    log.info("Find symbol \"" + symbolName + "\" failed: handle=0x" + Long.toHexString(handle) + ", LR=" + emulator.getContext().getLRPointer());
             this.error.setString(0, "Find symbol " + symbolName + " failed");
             return 0;
         }
+        //log.info("Find symbol \"" + symbolName + "\" success: handle=0x" + Long.toHexString(handle) + ", LR=" + emulator.getContext().getLRPointer());
         return symbol.getAddress();
     }
 
