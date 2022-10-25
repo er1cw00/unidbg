@@ -20,6 +20,7 @@ import com.github.unidbg.pointer.UnidbgPointer;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -33,10 +34,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 
 import capstone.Capstone;
-import jdk.internal.net.http.common.Pair;
+import capstone.api.Instruction;
+import net.dongliu.apk.parser.utils.Pair;
 import unicorn.Unicorn;
 import com.github.unidbg.arm.backend.UnHook;
 
@@ -56,7 +59,26 @@ public class NagaLoader {
     private Map<Long, Integer> addrMap = new TreeMap<Long, Integer>();
     private List<Pair<Long, Capstone.CsInsn[]>> blockList =new ArrayList<Pair<Long, Capstone.CsInsn[]>>();
 
+    private static void initLogger() {
+        Properties properties = new Properties();
+
+        properties.setProperty("log4j.debug", "false");
+        properties.setProperty("log4j.reset", "true");
+        properties.setProperty("log4j.rootLogger", "INFO, CONSOLE");
+
+        properties.setProperty("log4j.appender.CONSOLE", "org.apache.log4j.ConsoleAppender");
+        properties.setProperty("log4j.appender.Threshold", "DEBUG");
+        properties.setProperty("log4j.appender.CONSOLE.Target", "System.out");
+        properties.setProperty("log4j.appender.CONSOLE.layout", "org.apache.log4j.PatternLayout");
+
+        properties.setProperty("log4j.appender.FILE", "org.apache.log4j.FileAppender");
+        properties.setProperty("log4j.appender.FILE.File", "NagaLoader.log");
+        properties.setProperty("log4j.appender.FILE.Append", "false");
+        properties.setProperty("log4j.appender.FILE.layout", "org.apache.log4j.PatternLayout");
+        PropertyConfigurator.configure(properties);
+    }
     public static void main(String[] args) {
+        initLogger();
         NagaLoader loader = new NagaLoader(true);
         //loader.load();
         //loader.destroy();
