@@ -57,7 +57,7 @@ public class NagaLoader {
 //    private final String libPath = "/Users/wadahana/Desktop/tdx/xloader/xloader.so";
 
     private Map<Long, Integer> addrMap = new TreeMap<Long, Integer>();
-    private List<Pair<Long, Capstone.CsInsn[]>> blockList =new ArrayList<Pair<Long, Capstone.CsInsn[]>>();
+    private List<Pair<Long, Instruction[]>> blockList =new ArrayList<Pair<Long, Instruction[]>>();
 
     private static void initLogger() {
         Properties properties = new Properties();
@@ -101,8 +101,8 @@ public class NagaLoader {
         final long baseAddr = memory.MMAP_BASE;
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         //initRootfs();
-        trackInstrument();
-
+        trackInstrument(0x40000000,0x3CFB8,0x3D450);
+        //trackBlock(0x40000000,0x3CFB8,0x3D450);
 
 
 //        debugger = emulator.attach(DebuggerType.ANDROID_SERVER_V7);
@@ -120,15 +120,20 @@ public class NagaLoader {
         //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         //saveAddrMap(runAddrs);
     }
-    private void trackInstrument(long baseAddr, long start, long end) {
+    private void trackInstrument(final long baseAddr, long start, long end) {
         addrMap.clear();
         emulator.getBackend().hook_add_new(new CodeHook() {
             private UnHook unHook;
             @Override
             public void hook(Backend backend, long address, int size, Object user) {
                 //打印当前地址。这里要把unidbg使用的基址给去掉。
-                //System.out.println(String.format("0x%x",address-baseAddr));
                 long offset = address - baseAddr;
+                //System.out.println("code hook => offset:" + String.format("0x%x", offset) + ",size:" + size);
+                Instruction[] insns = emulator.disassemble(address, size,0);
+                for(Instruction ins :insns) {
+                    System.out.println("code hook => offset:" + String.format("0x%x", offset) +
+                            " " + ins.toString() + " ");
+                }
                 Integer value = addrMap.get(offset);
                 if (value == null) {
                     addrMap.put(offset, 1);
@@ -150,20 +155,39 @@ public class NagaLoader {
                     unHook.unhook();
                     unHook = null;
                 }
-                System.out.println("detach");
+                System.out.println("detach code hook");
             }
         },baseAddr+start,baseAddr+end,null);
 //        },baseAddr,baseAddr + 0x2063FF,null);
 //        },0x4003CFB8,0x4003D450,null);
     }
-    private void trackBlock(long baseAddr, long start, long end) {
+    private void trackBlock(final long baseAddr, long start, long end) {
         emulator.getBackend().hook_add_new(new BlockHook() {
+            private UnHook unHook;
             @Override
             public void hookBlock(Backend backend, long address, int size, Object user) {
-                Capstone.CsInsn[] insns = emulator.disassemble(address, size,0);
-                blockList.add(new Pair<Long, Capstone.CsInsn[]>(address,insns));
+                long offset = address - baseAddr;
+                System.out.println("block hook => offset:" + String.format("0x%x", offset) + ",size:" + size);
+                Instruction[] insns = emulator.disassemble(address, size,0);
+                blockList.add(new Pair<Long, Instruction[]>(address, insns));
             }
-        }, baseAddr + start,baseAddr + end,null););
+            @Override
+            public void onAttach(UnHook unHook) {
+                System.out.println("onAttach");
+                if (this.unHook != null) {
+                    throw new IllegalStateException();
+                }
+                this.unHook = unHook;
+            }
+            @Override
+            public void detach() {
+                if (unHook != null) {
+                    unHook.unhook();
+                    unHook = null;
+                }
+                System.out.println("detach block hook");
+            }
+        }, baseAddr + start,baseAddr + end,null);
     }
     private void destroy() {
         try {
