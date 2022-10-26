@@ -38,8 +38,8 @@ public class NagaLoader {
 //    private final DvmClass xloaderDVM;
     private final boolean logging;
     private final String packageName = "com.tdx.AndroidNew";
-    private final String rootDir = "/Users/wadahana/Desktop/tdx/rootfs";
-    private final String libPath = "/Users/wadahana/Desktop/tdx/libxloader.so";
+    private final String rootDir = "/Users/ricky.wu/workspace/cdoge/tdx/rootfs";
+    private final String libPath = "/Users/ricky.wu/workspace/cdoge/tdx/libxloader.so";
 //    private final String libPath = "/Users/wadahana/Desktop/tdx/xloader/xloader.so";
 
     public static void main(String[] args) {
@@ -55,8 +55,7 @@ public class NagaLoader {
         this.logging = logging;
         emulator = AndroidEmulatorBuilder.for64Bit()
                 .setProcessName(packageName)
-                .addBackendFactory(new Unicorn2Factory(true))
-                //.addBackendFactory(new DynarmicFactory(true))
+                .addBackendFactory(new Unicorn2Factory(true)) //DynarmicFactory
                 .setRootDir(new File(rootDir))
                 .build(); // 创建模拟器实例，要模拟32位或者64位，在这里区分
 
