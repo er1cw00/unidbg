@@ -2,8 +2,6 @@ package com.tdx.AndroidNew;
 
 import com.github.unidbg.AndroidEmulator;
 import com.github.unidbg.Module;
-import com.github.unidbg.arm.backend.Backend;
-import com.github.unidbg.arm.backend.CodeHook;
 
 import com.github.unidbg.arm.backend.DynarmicFactory;
 import com.github.unidbg.debugger.Debugger;
@@ -17,20 +15,12 @@ import com.github.unidbg.memory.Memory;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.PropertyConfigurator;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.Properties;
-import java.util.TreeMap;
-
-import capstone.api.Instruction;
-
-import com.github.unidbg.arm.backend.UnHook;
 
 public class NagaLoader {
 
@@ -70,10 +60,8 @@ public class NagaLoader {
 //        CodeTracker codeTracker = new CodeTracker("init", emulator, base);
 //        codeTracker.hook(0x3CFB8,0x3D450);
 
-        BlockTracker blkHooker = new BlockTracker("init", emulator, base);
+        CodeBlockTracker blkHooker = new CodeBlockTracker("init", emulator, base);
         blkHooker.hook(0x3CFB8,0x3D450);
-
-
 //        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
 
         vm = emulator.createDalvikVM(); // 创建Android虚拟机
@@ -83,6 +71,7 @@ public class NagaLoader {
         System.out.println("module base:" + Long.toHexString(module.base));
         //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         // codeTracker.save();
+        blkHooker.scanBlock(2);
         blkHooker.save();
     }
     private void destroy() {
