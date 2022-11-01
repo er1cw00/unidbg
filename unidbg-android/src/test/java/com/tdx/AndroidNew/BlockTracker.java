@@ -11,10 +11,12 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import capstone.Capstone;
 import capstone.api.Instruction;
 import unicorn.Arm64Const;
 
@@ -41,7 +43,35 @@ public class BlockTracker {
         public void addRef() {
             ref += 1;
         }
-
+        private capstone.api.arm64.Operand[] getArm64Operands(Instruction ins) {
+            capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
+            if (opInfo != null) {
+                return opInfo.getOperands();
+            }
+            return null;
+        }
+        public boolean checkFake() {
+            int len = instruction.length;
+            if (len >= 2) {
+                Instruction last2 = instruction[len - 2];
+                if (!last2.getMnemonic().equals("cmp")) {
+                    return false;
+                }
+                capstone.api.arm64.Operand[] ops = getArm64Operands(last2);
+                if (ops == null || ops.length < 2 || ops[0].getType() != capstone.Arm64_const.ARM64_OP_REG ) {
+                    return false;
+                }
+                int regId = last2.mapToUnicornReg(ops[0].getValue().getReg());
+                if (regId != Arm64Const.UC_ARM64_REG_W8) {
+                    return false;
+                }
+                ArrayList<String> jmpCmds = new ArrayList(Arrays.asList("b.eq","b.ne","b.le","b.gt"));
+                Instruction last = instruction[len - 1];
+                if (jmpCmds.contains(last.getMnemonic())) {
+                    return true;
+                }
+            }
+        }
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -143,5 +173,12 @@ public class BlockTracker {
         System.out.println("block hook => pc:" + Long.toHexString(pc) +
                 ",offset:" + String.format("0x%x", offset) +
                 ",size:" + size);
+    }
+    public void scanBlock() {
+        for (int i = 0; i < blockList.size(); i++) {
+            Long offset = blockList.get(i);
+            CodeBlock blk = blockMap.get(offset);
+            blk.checkFake();
+        }
     }
 }
