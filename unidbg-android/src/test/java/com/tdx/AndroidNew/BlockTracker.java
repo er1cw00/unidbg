@@ -8,12 +8,14 @@ import com.github.unidbg.arm.backend.UnHook;
 import org.apache.commons.io.FileUtils;
 
 import java.io.BufferedWriter;
+import java.io.CharArrayWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 import capstone.Capstone;
@@ -29,20 +31,46 @@ public class BlockTracker {
     private long end = 0;
     private String funcName;
 
+    public enum BlockType {
+        UNKNOWN("unknown", 0),
+        USED("used", 1),
+        FAKE("fake", 2);
+
+        private String name;
+        private int code;
+        BlockType(String name, int code) {
+            this.name = name;
+            this.code = code;
+        }
+        public String toString() {
+            return this.name;
+        }
+        public int getCode() {
+            return this.code;
+        }
+    }
     private class CodeBlock {
         private int ref;
         private long offset;
         private long base;
+        private BlockTracker.BlockType type;
         private Instruction[] instruction;
-        public CodeBlock(long offset, Instruction[] insns) {
+        public CodeBlock(long base, long offset, Instruction[] insns) {
             this.ref = 0;
+            this.base = base;
             this.offset = offset;
             this.instruction = insns;
-            this.base = 0x40000000;
+            this.type = BlockTracker.BlockType.UNKNOWN;
         }
         public void addRef() {
             ref += 1;
         }
+        public void setType(BlockTracker.BlockType type) {
+            this.type = type;
+        }
+        public BlockTracker.BlockType getType() {
+            return this.type;
+		}
         private capstone.api.arm64.Operand[] getArm64Operands(Instruction ins) {
             capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
             if (opInfo != null) {
@@ -77,13 +105,16 @@ public class BlockTracker {
             StringBuilder sb = new StringBuilder();
             sb.append("{\n");
             sb.append("\t\"ref\": ").append(ref).append(", \n");
+            sb.append("\t\"type\": \"").append(type).append("\", \n");
             sb.append("\t\"offset\": ").append(offset).append(", \n");
             int length = this.instruction.length;
             if (length > 0) {
                 sb.append("\t\"ins\": [\n");
                 for (int i = 0; i < length; i++) {
                     Instruction ins = this.instruction[i];
-                    sb.append("\t\t\"0x" + Long.toHexString(ins.getAddress() - base) + "   " +ins.toString() + "\"");
+                    sb.append("\t\t\"0x" + Long.toHexString(ins.getAddress() - base) +
+                            "   " + bytesToString(ins.getBytes()) +
+                            "   " + ins.toString() + "\"");
                     if (i + 1 < length) {
                         sb.append(",");
                     }
@@ -92,6 +123,18 @@ public class BlockTracker {
                 sb.append("\t]\n");
             }
             sb.append("}");
+            return sb.toString();
+        }
+        private String bytesToString(byte[] bytes) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < bytes.length; i++) {
+                String v = Integer.toHexString(bytes[i] & 0XFF);
+                if (v.length() == 1) {
+                    sb.append('0').append(v);
+                } else {
+                    sb.append(v);
+                }
+            }
             return sb.toString();
         }
     }
@@ -160,7 +203,7 @@ public class BlockTracker {
     private void track(long offset, Instruction[] insns) {
         CodeBlock block = blockMap.get(offset);
         if (block == null) {
-            block = new CodeBlock(offset, insns);
+            block = new CodeBlock(this.base, offset, insns);
             block.addRef();
             blockMap.put(offset, block);
         } else {
