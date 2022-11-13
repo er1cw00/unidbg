@@ -34,6 +34,8 @@ public abstract class Module {
         this.libraryFile = libraryFile;
     }
 
+    public void invokeInitFunctions(Emulator<?> emulator) {}
+
     public long getFileSize() {
         return libraryFile == null ? 0 : libraryFile.getFileSize();
     }

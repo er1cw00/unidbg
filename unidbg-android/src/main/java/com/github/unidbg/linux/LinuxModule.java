@@ -124,7 +124,12 @@ public class LinuxModule extends Module {
             throw new IllegalStateException("virtualMemoryAddressToFileOffset offset=0x" + Long.toHexString(offset));
         }
     }
-
+    public void invokeInitFunctions(Emulator<?> emulator) {
+        for (int i = 0; i < initFunctionList.size(); i++) {
+            InitFunction initFunction = initFunctionList.get(i);
+            initFunction.call(emulator);
+        }
+    }
     void callInitFunction(Emulator<?> emulator, boolean mustCallInit) throws IOException {
         if (!mustCallInit && !unresolvedSymbol.isEmpty()) {
             for (ModuleSymbol moduleSymbol : unresolvedSymbol) {
@@ -132,7 +137,7 @@ public class LinuxModule extends Module {
             }
             return;
         }
-
+        System.out.println("callInitFunction >>" + name);
         int index = 0;
         while (!initFunctionList.isEmpty()) {
             InitFunction initFunction = initFunctionList.remove(0);
