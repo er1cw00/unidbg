@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-public class CodeBlockHelper {
+public class CodeBlockMap {
     private Map<Long, CodeBlock> blockMap = new TreeMap<Long, CodeBlock>();
     private List<Long> blockList = new ArrayList<>();
 
