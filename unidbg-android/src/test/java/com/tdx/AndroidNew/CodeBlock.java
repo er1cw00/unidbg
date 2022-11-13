@@ -6,6 +6,7 @@ import java.util.List;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
+import capstone.api.RegsAccess;
 import unicorn.Arm64Const;
 
 public class CodeBlock {
@@ -31,7 +32,17 @@ public class CodeBlock {
     public CodeBlockType getType() {
         return this.type;
     }
-
+    public Long getOffset() {return this.offset;}
+    public int getCount() {return this.instruction.size();}
+    public Long getStart() {
+        Instruction ins = this.instruction.get(0);
+        return ins.getAddress() - this.base;
+    }
+    public Long getEnd() {
+        int len = this.instruction.size();
+        Instruction ins = this.instruction.get(len - 1);
+        return ins.getAddress() - this.base;
+    }
     public CodeBlockType checkType() {
         int len = instruction.size();
         ArrayList<String> jmpCmds = new ArrayList(Arrays.asList("b.eq","b.ne","b.le","b.gt"));
@@ -53,6 +64,13 @@ public class CodeBlock {
                 }
             }
         }
+//        for (int i = 0; i < len; i++) {
+//            Instruction ins = instruction.get(i);
+//            short[] regs = writeRegs(ins);
+//            for (int j = 0; j < regs.length; j++) {
+//            }
+//            //System.out.printf("write:[" + w + "], read:["+ r + "], Instruction:" + ins + "\n");
+//        }
         return CodeBlockType.USED;
     }
 
@@ -92,6 +110,27 @@ public class CodeBlock {
             }
         }
         return sb.toString();
+    }
+    private short[] readRegs(Instruction ins) {
+        short[] regs;
+        RegsAccess access = ins.regsAccess();
+        if (access != null) {
+            regs = access.getRegsRead();;
+        } else {
+            regs = new short[0];
+        }
+
+        return regs;
+    }
+    private short[] writeRegs(Instruction ins) {
+        short[] regs;
+        RegsAccess access = ins.regsAccess();
+        if (access == null) {
+            regs = access.getRegsWrite();;
+        } else {
+            regs = new short[0];
+        }
+        return regs;
     }
     private capstone.api.arm64.Operand[] getArm64Operands(Instruction ins) {
         capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
