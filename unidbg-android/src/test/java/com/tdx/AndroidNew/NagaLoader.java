@@ -38,6 +38,7 @@ public class NagaLoader {
     public static void main(String[] args) {
         initLogger();
         NagaLoader loader = new NagaLoader(true);
+
 //        loader.load();
 //        loader.destroy();
     }
@@ -56,10 +57,7 @@ public class NagaLoader {
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         // libxloader.si total size : 0x2063FF
 //        initRootfs();
-
-//        CodeTracker codeTracker = new CodeTracker("init", emulator, base);
-//        codeTracker.hook(0x3CFB8,0x3D450);
-
+        memory.disableCallInitFunction();
         CodeBlockTracker blkHooker = new CodeBlockTracker("init", emulator, base);
         blkHooker.hook(0x3CFB8,0x3D450);
 //        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
@@ -70,9 +68,15 @@ public class NagaLoader {
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
         System.out.println("module base:" + Long.toHexString(module.base));
         //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-        // codeTracker.save();
-        blkHooker.scanBlock(2);
-        blkHooker.save();
+        blkHooker.resetTag("main");
+        module.invokeInitFunctions(emulator);
+        blkHooker.save("main");
+
+        System.out.println(">>>>>>>");
+
+//        blkHooker.resetTag("branch");
+//        module.invokeInitFunctions(emulator);
+//        blkHooker.save("branch");
     }
     private void destroy() {
         try {
