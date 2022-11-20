@@ -17,7 +17,7 @@ import capstone.Arm64_const;
 import capstone.api.Instruction;
 import unicorn.Arm64Const;
 
-public class CodeBlockTracker {
+public class NagaTracker {
 
 
     private AndroidEmulator emulator = null;
@@ -28,8 +28,19 @@ public class CodeBlockTracker {
     private String mTag = "main";
     private CodeBlockList mBlockList = new CodeBlockList();
     private CodeBlockMap mBlockMap = new CodeBlockMap();
+    private static int N_BIT = 31;
+    private static int Z_BIT = 30;
+    private static int C_BIT = 29;
+    private static int V_BIT = 28;
+    private static int N_MASK = (1 << N_BIT);
+    private static int Z_MASK = (1 << Z_BIT);
+    private static int C_MASK = (1 << C_BIT);
+    private static int V_MASK = (1 << V_BIT);
 
-    public CodeBlockTracker(String funcName, AndroidEmulator emulator, long base) {
+    private static int getBit(int nzcv, int pos) {
+        return (nzcv >> pos) & 0x00000001;
+    }
+    public NagaTracker(String funcName, AndroidEmulator emulator, long base) {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
@@ -147,29 +158,30 @@ public class CodeBlockTracker {
         if (opInfo == null) {
             return;
         }
+
         capstone.api.arm64.Operand[] ops = opInfo.getOperands();
         if (ops == null || ops.length == 0)  {
             return;
         }
+
         System.out.println("trackCode:" + Long.toHexString(offset) +
                            ",blk:" + Long.toHexString(block.getOffset()) +
                            "," + ins.getMnemonic() +
                            " " + ins.getOpStr());
         int reg1 = ins.mapToUnicornReg(ops[0].getValue().getReg());
-        int reg2 = ins.mapToUnicornReg(ops[0].getValue().getReg());
-        int reg3 = ins.mapToUnicornReg(ops[0].getValue().getReg());
-        System.out.println("     reg1:" + reg1 +
-                               ",reg2:" + reg2 +
-                               ",reg3:" + reg3;
+        int reg2 = ins.mapToUnicornReg(ops[1].getValue().getReg());
+        int reg3 = ins.mapToUnicornReg(ops[2].getValue().getReg());
+        int cc = opInfo.getCodeCondition();
+
         int w8 = emulator.getBackend().reg_read(reg1).intValue();
         int wx = emulator.getBackend().reg_read(reg2).intValue();
-        
-        emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_W10,w9);
-
-        System.out.println("      w8:" + Arm64Const.UC_ARM64_REG_W8 +
-                                ",w9:" + Arm64Const.UC_ARM64_REG_W9 +
-                                ",w24:" + Arm64Const.UC_ARM64_REG_W24 +
-                                ",w28:" + Arm64Const.UC_ARM64_REG_W28);
+        int wy = emulator.getBackend().reg_read(reg3).intValue();
+        int nzcv = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_NZCV).intValue();
+        //emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_W10, w9);
+        System.out.println("      w8:" + Integer.toHexString(w8) +
+                                ",wx:" + Integer.toHexString(wx) +
+                                ",wy:" + Integer.toHexString(wy) +
+                                ",nzvc:" + Integer.toHexString(nzcv));
 
         return;
     }
@@ -185,7 +197,45 @@ public class CodeBlockTracker {
         }
         mBlockList.add(mTag, offset);
     }
+    private boolean checkBranch(int cc, int nzcv) {
+        switch (cc) {
+            case Arm64_const.ARM64_CC_INVALID:
+                return false;
+            case Arm64_const.ARM64_CC_EQ:
+                return getBit(nzcv, Z_BIT) != 0;
+            case Arm64_const.ARM64_CC_NE:
+                return getBit(nzcv, Z_BIT) == 0;
+            case Arm64_const.ARM64_CC_HS:
+                return getBit(nzcv, C_BIT) != 0;
+            case Arm64_const.ARM64_CC_LO:
+                return getBit(nzcv, C_BIT) == 0;
+            case Arm64_const.ARM64_CC_MI:
+                return getBit(nzcv, N_BIT) != 0;
+            case Arm64_const.ARM64_CC_PL:
+                return getBit(nzcv, N_BIT) == 0;
+            case Arm64_const.ARM64_CC_VS:
+                return getBit(nzcv, V_BIT) != 0;
+            case Arm64_const.ARM64_CC_VC:
+                return getBit(nzcv, V_BIT) == 0;
+            case Arm64_const.ARM64_CC_HI:
+                return getBit(nzcv, C_BIT) != 0 && getBit(nzcv, Z_BIT) == 0;
+            case Arm64_const.ARM64_CC_LS:
+                return getBit(nzcv, C_BIT) == 0 && getBit(nzcv, Z_BIT) != 0;
+            case Arm64_const.ARM64_CC_GE:
+                return getBit(nzcv, N_BIT) == getBit(nzcv, V_BIT);
+            case Arm64_const.ARM64_CC_LT:
+                return getBit(nzcv, N_BIT) != getBit(nzcv, V_BIT);
+            case Arm64_const.ARM64_CC_GT:
+                return getBit(nzcv, Z_BIT) == 0 && getBit(nzcv, N_BIT) == getBit(nzcv, V_BIT);
+            case Arm64_const.ARM64_CC_LE:
+                return getBit(nzcv, Z_BIT) == 1 && getBit(nzcv, N_BIT) != getBit(nzcv, V_BIT);
+            case Arm64_const.ARM64_CC_AL:
+                return true;
+            case Arm64_const.ARM64_CC_NV:
+                return false;
 
+        }
+    }
     private void logBlock(long address, int size) {
         long offset = address - base;
         long pc = this.emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_PC).longValue();

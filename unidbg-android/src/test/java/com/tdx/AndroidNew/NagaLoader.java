@@ -58,7 +58,7 @@ public class NagaLoader {
         // libxloader.si total size : 0x2063FF
 //        initRootfs();
         memory.disableCallInitFunction();
-        CodeBlockTracker blkHooker = new CodeBlockTracker("init", emulator, base);
+        NagaTracker blkHooker = new NagaTracker("init", emulator, base);
         blkHooker.hook(0x3CFB8,0x3D450);
 //        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
 
