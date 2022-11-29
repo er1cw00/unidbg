@@ -28,6 +28,7 @@ public class NagaHooker {
     private String mTag = "main";
     private CodeBlockList mBlockList = new CodeBlockList();
     private CodeBlockMap mBlockMap = new CodeBlockMap();
+    private CodeBlockTracker mBlockTracker = new CodeBlockTracker();
     private static int N_BIT = 31;
     private static int Z_BIT = 30;
     private static int C_BIT = 29;
