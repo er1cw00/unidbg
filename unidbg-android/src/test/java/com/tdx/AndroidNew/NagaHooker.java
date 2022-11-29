@@ -233,8 +233,8 @@ public class NagaHooker {
                 return true;
             case Arm64_const.ARM64_CC_NV:
                 return false;
-
         }
+        return false;
     }
     private void logBlock(long address, int size) {
         long offset = address - base;
