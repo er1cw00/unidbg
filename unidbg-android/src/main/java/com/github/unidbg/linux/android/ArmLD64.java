@@ -238,7 +238,9 @@ public class ArmLD64 extends Dlfcn {
                             String soname = "";
                             if (filename != null) {
                                 soname = filename.getString(0);
-                                log.warn("filename is null");
+                                log.warn("filename is " + soname);
+                            } else {
+                                log.warn("filename is null"); // open linker
                             }
                             return dlopen(emulator.getMemory(), soname, emulator);
                         }
