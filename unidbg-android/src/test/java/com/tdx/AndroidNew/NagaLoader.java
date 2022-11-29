@@ -58,14 +58,15 @@ public class NagaLoader {
         // libxloader.si total size : 0x2063FF
 //        initRootfs();
         memory.disableCallInitFunction();
-        NagaTracker blkHooker = new NagaTracker("init", emulator, base);
-        blkHooker.hook(0x3CFB8,0x3D450);
+        NagaHooker blkHooker = new NagaHooker("init", emulator, base);
+        blkHooker.hook(0x3CFB8, 0x3D450);
 //        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
 
         vm = emulator.createDalvikVM(); // 创建Android虚拟机
         vm.setVerbose(logging); // 设置是否打印Jni调用细节
         DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
+
         System.out.println("module base:" + Long.toHexString(module.base));
         //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         blkHooker.resetTag("main");

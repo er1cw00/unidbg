@@ -17,7 +17,7 @@ import capstone.Arm64_const;
 import capstone.api.Instruction;
 import unicorn.Arm64Const;
 
-public class NagaTracker {
+public class NagaHooker {
 
 
     private AndroidEmulator emulator = null;
@@ -40,7 +40,7 @@ public class NagaTracker {
     private static int getBit(int nzcv, int pos) {
         return (nzcv >> pos) & 0x00000001;
     }
-    public NagaTracker(String funcName, AndroidEmulator emulator, long base) {
+    public NagaHooker(String funcName, AndroidEmulator emulator, long base) {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
