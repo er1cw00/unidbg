@@ -4,6 +4,7 @@ import com.github.unidbg.arm.backend.Backend;
 import com.github.unidbg.memory.MemRegion;
 import com.github.unidbg.memory.SvcMemory;
 import com.github.unidbg.pointer.UnidbgPointer;
+import com.github.unidbg.spi.InitFunction;
 import com.github.unidbg.spi.InitFunctionListener;
 import com.github.unidbg.spi.LibraryFile;
 
@@ -35,6 +36,8 @@ public abstract class Module {
     }
 
     public void invokeInitFunctions(Emulator<?> emulator) {}
+
+    public List<InitFunction> getInitFunctions() { return null; }
 
     public long getFileSize() {
         return libraryFile == null ? 0 : libraryFile.getFileSize();

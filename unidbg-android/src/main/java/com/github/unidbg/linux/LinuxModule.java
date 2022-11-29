@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -130,6 +131,10 @@ public class LinuxModule extends Module {
             initFunction.call(emulator);
         }
     }
+    public List<InitFunction> getInitFunctions() {
+        return initFunctionList;
+    }
+
     void callInitFunction(Emulator<?> emulator, boolean mustCallInit) throws IOException {
         if (!mustCallInit && !unresolvedSymbol.isEmpty()) {
             for (ModuleSymbol moduleSymbol : unresolvedSymbol) {

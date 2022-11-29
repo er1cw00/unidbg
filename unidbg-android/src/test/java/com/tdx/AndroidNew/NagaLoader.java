@@ -11,6 +11,7 @@ import com.github.unidbg.linux.android.AndroidResolver;
 import com.github.unidbg.linux.android.dvm.DalvikModule;
 import com.github.unidbg.linux.android.dvm.VM;
 import com.github.unidbg.memory.Memory;
+import com.github.unidbg.spi.InitFunction;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.PropertyConfigurator;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Properties;
 
 public class NagaLoader {
@@ -66,13 +68,18 @@ public class NagaLoader {
         vm.setVerbose(logging); // 设置是否打印Jni调用细节
         DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
+        List<InitFunction> funcs = module.getInitFunctions();
+        System.out.println("module base:" + Long.toHexString(module.base) + ",init func:" + funcs.size());
+        InitFunction func = funcs.get(0);
+        func.call(emulator);
 
-        System.out.println("module base:" + Long.toHexString(module.base));
-        //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-        blkHooker.resetTag("main");
-        module.invokeInitFunctions(emulator);
-        blkHooker.save("main");
 
+
+//
+//        //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
+//        blkHooker.resetTag("main");
+//        module.invokeInitFunctions(emulator);
+//        blkHooker.save("main");
         System.out.println(">>>>>>>");
 
 //        blkHooker.resetTag("branch");
