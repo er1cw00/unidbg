@@ -9,9 +9,6 @@ import com.github.unidbg.arm.backend.UnHook;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
@@ -26,9 +23,9 @@ public class NagaHooker {
     private long end = 0;
     private String funcName;
     private String mTag = "main";
-    private CodeBlockList mBlockList = new CodeBlockList();
-    private CodeBlockMap mBlockMap = new CodeBlockMap();
-    private CodeBlockTracker mBlockTracker = new CodeBlockTracker();
+    private CodeBlockList blockList = new CodeBlockList();
+    private CodeBlockMap blockMap = new CodeBlockMap();
+    private CodeBranchTracker branchTracker = new CodeBranchTracker();
     private static int N_BIT = 31;
     private static int Z_BIT = 30;
     private static int C_BIT = 29;
@@ -48,7 +45,7 @@ public class NagaHooker {
     }
     public void resetTag(String tag) {
         mTag = tag;
-        this.mBlockList.resetList(tag);
+        this.blockList.resetList(tag);
     }
     public void hook(long start, long end) {
         this.start = start;
@@ -62,16 +59,16 @@ public class NagaHooker {
         File file = new File(rootDir + File.separator + this.funcName + "_"+ tag +"_block.txt" );
         System.out.println("save block track: " + file.getAbsoluteFile());
         try {
-            System.out.printf("saveCodeBlock list size: " + mBlockList.size(tag) +",map size:" + mBlockMap.size() + "\n");
+            System.out.printf("saveCodeBlock list size: " + blockList.size(tag) +",map size:" + blockMap.size() + "\n");
             file.createNewFile();
             FileWriter writer = new FileWriter(file.getAbsoluteFile());
             BufferedWriter bufferedWriter = new BufferedWriter(writer);
             bufferedWriter.write("[\n");
-            for (int i = 0; i < mBlockList.size(tag); i++) {
-                Long offset = mBlockList.get(tag, i);
-                CodeBlock blk = mBlockMap.findBlock(offset);
+            for (int i = 0; i < blockList.size(tag); i++) {
+                Long offset = blockList.get(tag, i);
+                CodeBlock blk = blockMap.findBlock(offset);
                 bufferedWriter.write(blk.toString());
-                if (i + 1 < mBlockList.size(tag)) {
+                if (i + 1 < blockList.size(tag)) {
                     bufferedWriter.write(",\n");
                 }
             }
@@ -140,13 +137,14 @@ public class NagaHooker {
     }
     private void trackCode(Backend backend, long address, int size) {
         long offset = address - base;
-        CodeBlock block = mBlockMap.searchBlock(offset);
+        CodeBlock block = blockMap.searchBlock(offset);
         if (block == null) {
             return;
         }
-        if (block.getType() != CodeBlockType.USED ) {
+        if (block.getType() != CodeBlockType.USED) {
             return;
         }
+        Long blkOffset = block.getOffset();
         Instruction[] insns = emulator.disassemble(address, size,0);
         if (insns.length <= 0) {
             return;
@@ -188,15 +186,15 @@ public class NagaHooker {
     }
     private void trackBlock(Backend backend, long address, int size) {
         long offset = address - base;
-        CodeBlock block = mBlockMap.findBlock(offset);
+        CodeBlock block = blockMap.findBlock(offset);
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
             block = new CodeBlock(this.base, offset, insns);
-            mBlockMap.addBlock(block);
+            blockMap.addBlock(block);
         } else {
             block.addRef();
         }
-        mBlockList.add(mTag, offset);
+        blockList.add(mTag, offset);
     }
     private boolean checkBranch(int cc, int nzcv) {
         switch (cc) {
