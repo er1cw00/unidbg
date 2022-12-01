@@ -155,12 +155,11 @@ public class NagaHooker {
         }
         capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
         if (opInfo == null) {
-            return;
+            throw new RuntimeException("Track Code [" + ins.toString() + "] get OpInfo fail!");
         }
-
         capstone.api.arm64.Operand[] ops = opInfo.getOperands();
         if (ops == null || ops.length == 0)  {
-            return;
+            throw new RuntimeException("Track Code [" + ins.toString() + "] Operand is empty!");
         }
 
         System.out.println("trackCode:" + Long.toHexString(offset) +
@@ -176,11 +175,21 @@ public class NagaHooker {
         int wx = emulator.getBackend().reg_read(reg2).intValue();
         int wy = emulator.getBackend().reg_read(reg3).intValue();
         int nzcv = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_NZCV).intValue();
+
         //emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_W10, w9);
         System.out.println("      w8:" + Integer.toHexString(w8) +
                                 ",wx:" + Integer.toHexString(wx) +
                                 ",wy:" + Integer.toHexString(wy) +
                                 ",nzvc:" + Integer.toHexString(nzcv));
+
+        CodeBranch branch = branchTracker.get(offset);
+        if (branch == null) {
+            branch = new CodeBranch(offset, blkOffset, ins);
+            branchTracker.set(branch);
+        }
+        int index = branchTracker.push(offset);
+        System.out.println("branch stack:"+index+",cc:"+nzcv);
+        //branch.append(nzcv);
 
         return;
     }
