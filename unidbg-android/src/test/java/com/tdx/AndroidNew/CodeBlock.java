@@ -1,5 +1,7 @@
 package com.tdx.AndroidNew;
 
+import net.dongliu.apk.parser.utils.Pair;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,13 +76,34 @@ public class CodeBlock {
         return CodeBlockType.USED;
     }
 
-    @Override
-    public String toString() {
+    public String toString(CodeBranch branch) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
-        sb.append("\t\"ref\": ").append(ref).append(", \n");
         sb.append("\t\"type\": \"").append(type).append("\", \n");
-        sb.append("\t\"offset\": ").append(offset).append(", \n");
+        sb.append("\t\"offset\": ").append(Long.toHexString(offset)).append(", \n");
+
+        if (branch != null) {
+            sb.append("\t\"branch\": {\n").append(", \n");
+            sb.append("\t\t\"offset\": ").append(Long.toHexString(branch.getInsOffset())).append(", \n");
+            sb.append("\t\t\"cc\": \"").append(CodeBranch.ccLabel(branch.getCC())).append("\", \n");
+
+            int length = branch.size();
+            if (length > 0) {
+                sb.append("\t\t\"list\": [\n");
+                for (int i = 0; i < length; i++) {
+                    Pair<Integer, Integer> pair = branch.get(i);
+                    int idx = pair.getLeft().intValue();
+                    int nzvc = pair.getRight().intValue();
+                    sb.append("\t\t\t{\"index\": " + idx +", \"nzvc\": " + CodeBranch.nzvcLabel(pair.getRight()) + ", \"result\": " + CodeBranch.checkBranch(branch.getCC(), nzvc) +"}");
+                    if (i + 1 < length) {
+                        sb.append(",");
+                    }
+                    sb.append("\n");
+                }
+                sb.append("\t\t]\n");
+            }
+            sb.append("\t}");
+        }
         int length = this.instruction.size();
         if (length > 0) {
             sb.append("\t\"ins\": [\n");

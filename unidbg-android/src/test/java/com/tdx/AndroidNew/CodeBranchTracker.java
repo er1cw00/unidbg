@@ -9,15 +9,18 @@ public class CodeBranchTracker {
     private List<Long> stack = new ArrayList<Long>();
     private Map<Long, CodeBranch> map = new TreeMap<Long, CodeBranch>();
     public CodeBranchTracker() {
-
     }
     public int size() {
         return stack.size();
     }
-    public CodeBranch get(Long offset) {
+    public CodeBranch getByOffset(Long offset) {
         return map.get(offset);
     }
-    public void set(CodeBranch branch) {
+    public CodeBranch getByIndex(int i) {
+        Long offset = stack.get(i);
+        return map.get(offset);
+    }
+    public void add(CodeBranch branch) {
         Long offset = branch.getInsOffset();
         CodeBranch v = map.get(offset);
         if (v != null) {

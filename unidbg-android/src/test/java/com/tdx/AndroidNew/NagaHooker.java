@@ -26,22 +26,12 @@ public class NagaHooker {
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
-    private static int N_BIT = 31;
-    private static int Z_BIT = 30;
-    private static int C_BIT = 29;
-    private static int V_BIT = 28;
-    private static int N_MASK = (1 << N_BIT);
-    private static int Z_MASK = (1 << Z_BIT);
-    private static int C_MASK = (1 << C_BIT);
-    private static int V_MASK = (1 << V_BIT);
 
-    private static int getBit(int nzcv, int pos) {
-        return (nzcv >> pos) & 0x00000001;
-    }
     public NagaHooker(String funcName, AndroidEmulator emulator, long base) {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
+        resetTag("main");
     }
     public void resetTag(String tag) {
         mTag = tag;
@@ -53,7 +43,33 @@ public class NagaHooker {
         hookBlock(start, end);
         hookCode(start,end);
     }
-
+    public void saveBlock() {
+        System.out.println("save blocks: " + blockMap.size());
+    }
+    public void saveTracker() {
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir + File.separator + this.funcName +"_tk.txt" );
+        System.out.println("save track: " + file.getAbsoluteFile());
+        try {
+            file.createNewFile();
+            FileWriter writer = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            bufferedWriter.write("[\n");
+            for (int i = 0; i < branchTracker.size(); i++) {
+                CodeBranch branch = branchTracker.getByIndex(i);
+                CodeBlock blk = blockMap.findBlock(branch.getBlkOffset());
+                bufferedWriter.write(blk.toString(branch));
+                if (i + 1 < branchTracker.size()) {
+                    bufferedWriter.write(",\n");
+                }
+            }
+            bufferedWriter.write("]\n");
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
+        }
+    }
     public void save(String tag) {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
         File file = new File(rootDir + File.separator + this.funcName + "_"+ tag +"_block.txt" );
@@ -67,7 +83,7 @@ public class NagaHooker {
             for (int i = 0; i < blockList.size(tag); i++) {
                 Long offset = blockList.get(tag, i);
                 CodeBlock blk = blockMap.findBlock(offset);
-                bufferedWriter.write(blk.toString());
+                bufferedWriter.write(blk.toString(null));
                 if (i + 1 < blockList.size(tag)) {
                     bufferedWriter.write(",\n");
                 }
@@ -177,20 +193,19 @@ public class NagaHooker {
         int nzcv = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_NZCV).intValue();
 
         //emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_W10, w9);
-        System.out.println("      w8:" + Integer.toHexString(w8) +
-                                ",wx:" + Integer.toHexString(wx) +
-                                ",wy:" + Integer.toHexString(wy) +
-                                ",nzvc:" + Integer.toHexString(nzcv));
+//        System.out.println("      w8:" + Integer.toHexString(w8) +
+//                                ",wx:" + Integer.toHexString(wx) +
+//                                ",wy:" + Integer.toHexString(wy) +
+//                                ",nzvc:" + Integer.toHexString(nzcv));
 
-        CodeBranch branch = branchTracker.get(offset);
+        CodeBranch branch = branchTracker.getByOffset(offset);
         if (branch == null) {
-            branch = new CodeBranch(offset, blkOffset, ins);
-            branchTracker.set(branch);
+            branch = new CodeBranch(offset, blkOffset, cc, ins);
+            branchTracker.add(branch);
         }
         int index = branchTracker.push(offset);
-        System.out.println("branch stack:"+index+",cc:"+nzcv);
-        //branch.append(nzcv);
-
+        //System.out.println("branch stack:"+index+",cc:"+nzcv);
+        branch.add(index,nzcv);
         return;
     }
     private void trackBlock(Backend backend, long address, int size) {
@@ -204,45 +219,6 @@ public class NagaHooker {
             block.addRef();
         }
         blockList.add(mTag, offset);
-    }
-    private boolean checkBranch(int cc, int nzcv) {
-        switch (cc) {
-            case Arm64_const.ARM64_CC_INVALID:
-                return false;
-            case Arm64_const.ARM64_CC_EQ:
-                return getBit(nzcv, Z_BIT) != 0;
-            case Arm64_const.ARM64_CC_NE:
-                return getBit(nzcv, Z_BIT) == 0;
-            case Arm64_const.ARM64_CC_HS:
-                return getBit(nzcv, C_BIT) != 0;
-            case Arm64_const.ARM64_CC_LO:
-                return getBit(nzcv, C_BIT) == 0;
-            case Arm64_const.ARM64_CC_MI:
-                return getBit(nzcv, N_BIT) != 0;
-            case Arm64_const.ARM64_CC_PL:
-                return getBit(nzcv, N_BIT) == 0;
-            case Arm64_const.ARM64_CC_VS:
-                return getBit(nzcv, V_BIT) != 0;
-            case Arm64_const.ARM64_CC_VC:
-                return getBit(nzcv, V_BIT) == 0;
-            case Arm64_const.ARM64_CC_HI:
-                return getBit(nzcv, C_BIT) != 0 && getBit(nzcv, Z_BIT) == 0;
-            case Arm64_const.ARM64_CC_LS:
-                return getBit(nzcv, C_BIT) == 0 && getBit(nzcv, Z_BIT) != 0;
-            case Arm64_const.ARM64_CC_GE:
-                return getBit(nzcv, N_BIT) == getBit(nzcv, V_BIT);
-            case Arm64_const.ARM64_CC_LT:
-                return getBit(nzcv, N_BIT) != getBit(nzcv, V_BIT);
-            case Arm64_const.ARM64_CC_GT:
-                return getBit(nzcv, Z_BIT) == 0 && getBit(nzcv, N_BIT) == getBit(nzcv, V_BIT);
-            case Arm64_const.ARM64_CC_LE:
-                return getBit(nzcv, Z_BIT) == 1 && getBit(nzcv, N_BIT) != getBit(nzcv, V_BIT);
-            case Arm64_const.ARM64_CC_AL:
-                return true;
-            case Arm64_const.ARM64_CC_NV:
-                return false;
-        }
-        return false;
     }
     private void logBlock(long address, int size) {
         long offset = address - base;
