@@ -4,6 +4,7 @@ import com.github.unidbg.AndroidEmulator;
 import com.github.unidbg.Module;
 
 import com.github.unidbg.arm.backend.DynarmicFactory;
+import com.github.unidbg.arm.backend.Unicorn2Factory;
 import com.github.unidbg.debugger.Debugger;
 import com.github.unidbg.debugger.DebuggerType;
 import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
@@ -50,7 +51,8 @@ public class NagaLoader {
         this.logging = logging;
         emulator = AndroidEmulatorBuilder.for64Bit()
                 .setProcessName(packageName)
-                .addBackendFactory(new DynarmicFactory(true))
+                .addBackendFactory(new Unicorn2Factory(true))
+                //.addBackendFactory(new DynarmicFactory(true))
                 .setRootDir(new File(rootDir))
                 .build(); // 创建模拟器实例，要模拟32位或者64位，在这里区分
 
@@ -70,9 +72,16 @@ public class NagaLoader {
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
         List<InitFunction> funcs = module.getInitFunctions();
         System.out.println("module base:" + Long.toHexString(module.base) + ",init func:" + funcs.size());
-        InitFunction func = funcs.get(0);
-        func.call(emulator);
 
+//        InitFunction func = funcs.get(0);
+//        for(int i = 0; i < 1; i++) {
+//            String tag = "Tag" + i;
+//            blkHooker.resetTag(tag);
+//            func.call(emulator);
+//            blkHooker.save(tag);
+//        }
+        blkHooker.save("main");
+        //blkHooker.saveTracker();
 
 
 //

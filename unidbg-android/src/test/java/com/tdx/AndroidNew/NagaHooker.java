@@ -41,7 +41,7 @@ public class NagaHooker {
         this.start = start;
         this.end = end;
         hookBlock(start, end);
-        hookCode(start,end);
+        //hookCode(start,end);
     }
     public void saveBlock() {
         System.out.println("save blocks: " + blockMap.size());
