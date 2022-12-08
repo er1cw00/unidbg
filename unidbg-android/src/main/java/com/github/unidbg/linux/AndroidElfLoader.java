@@ -175,7 +175,12 @@ public class AndroidElfLoader extends AbstractLoader<AndroidFileIO> implements M
             resolveSymbols(!forceCallInit);
             if (callInitFunction || forceCallInit) {
                 for (LinuxModule m : modules.values().toArray(new LinuxModule[0])) {
+                    if (m.name.equals("libxloader.so")) {
+                        log.warn("skip call libxloader's initFunctions !");
+                        continue;
+                    }
                     boolean forceCall = (forceCallInit && m == module) || m.isForceCallInit();
+                    System.out.println("callInitFunction >>>>" + m.name);
                     if (callInitFunction) {
                         m.callInitFunction(emulator, forceCall);
                     } else if (forceCall) {
@@ -239,6 +244,9 @@ public class AndroidElfLoader extends AbstractLoader<AndroidFileIO> implements M
             resolveSymbols(false);
             if (!callInitFunction) { // No need call init array
                 for (LinuxModule m : modules.values()) {
+                    if (m.name.equals("libxloader.so")) {
+                        log.warn("skip clear libxloader's initFunctions !");
+                    }
                     m.initFunctionList.clear();
                 }
             }

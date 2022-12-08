@@ -102,8 +102,11 @@ public class LinuxModule extends Module {
                 List<ModuleSymbol> unresolvedSymbol, List<InitFunction> initFunctionList, Map<String, Module> neededLibraries, List<MemRegion> regions,
                 MemoizedObject<ArmExIdx> armExIdx, MemoizedObject<GnuEhFrameHeader> ehFrameHeader,
                 ElfSection symbolTableSection, ElfFile elfFile, ElfDynamicStructure dynamicStructure, LibraryFile libraryFile) {
-        super(name, base, size, neededLibraries, regions, libraryFile);
 
+        super(name, base, size, neededLibraries, regions, libraryFile);
+        if (name.equals("libxloader.so")) {
+            log.info("Module: libxloader.so" );
+        }
         this.virtualBase = virtualBase;
         this.dynsym = dynsym;
         this.unresolvedSymbol = unresolvedSymbol;
@@ -140,6 +143,10 @@ public class LinuxModule extends Module {
             for (ModuleSymbol moduleSymbol : unresolvedSymbol) {
                 log.info("[" + name + "]" + moduleSymbol.getSymbol().getName() + " symbol is missing before init relocationAddr=" + moduleSymbol.getRelocationAddr());
             }
+            return;
+        }
+        if (name.equals("libxloader.so")) {
+            log.warn("skip call libxloader's initFunctions!");
             return;
         }
         System.out.println("callInitFunction >>" + name);

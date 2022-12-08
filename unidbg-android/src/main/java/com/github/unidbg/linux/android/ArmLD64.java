@@ -344,15 +344,17 @@ public class ArmLD64 extends Dlfcn {
                 pointer.setLong(0, 0);
 
                 LinuxModule m = (LinuxModule) module;
-                if (m.getUnresolvedSymbol().isEmpty()) {
+                if (m.name.equals("libxloader.so")) {
+                    log.warn("skip libxloader's initFunctions !");
+                } else if (m.getUnresolvedSymbol().isEmpty()) {
                     for (InitFunction initFunction : m.initFunctionList) {
                         long address = initFunction.getAddress();
                         if (address == 0) {
                             continue;
                         }
-                        if (log.isDebugEnabled()) {
-                            log.debug("[" + m.name + "]PushInitFunction: 0x" + Long.toHexString(address));
-                        }
+                        //if (log.isDebugEnabled()) {
+                            log.error("[" + m.name + "]PushInitFunction: 0x" + Long.toHexString(address));
+                        //}
                         pointer = pointer.share(-8, 0); // init array
                         pointer.setLong(0, address);
                     }
