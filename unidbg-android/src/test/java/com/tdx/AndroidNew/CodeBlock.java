@@ -80,11 +80,11 @@ public class CodeBlock {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("\t\"type\": \"").append(type).append("\", \n");
-        sb.append("\t\"offset\": ").append(Long.toHexString(offset)).append(", \n");
+        sb.append("\t\"offset\": \"0x").append(Long.toHexString(offset)).append("\", \n");
 
         if (branch != null) {
             sb.append("\t\"branch\": {\n").append(", \n");
-            sb.append("\t\t\"offset\": ").append(Long.toHexString(branch.getInsOffset())).append(", \n");
+            sb.append("\t\t\"offset\": \"").append(Long.toHexString(branch.getInsOffset())).append("\", \n");
             sb.append("\t\t\"cc\": \"").append(CodeBranch.ccLabel(branch.getCC())).append("\", \n");
 
             int length = branch.size();
