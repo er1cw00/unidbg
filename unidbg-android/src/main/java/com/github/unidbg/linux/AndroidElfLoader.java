@@ -180,7 +180,6 @@ public class AndroidElfLoader extends AbstractLoader<AndroidFileIO> implements M
                         continue;
                     }
                     boolean forceCall = (forceCallInit && m == module) || m.isForceCallInit();
-                    System.out.println("callInitFunction >>>>" + m.name);
                     if (callInitFunction) {
                         m.callInitFunction(emulator, forceCall);
                     } else if (forceCall) {

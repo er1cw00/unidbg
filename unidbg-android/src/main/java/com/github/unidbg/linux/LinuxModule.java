@@ -149,7 +149,6 @@ public class LinuxModule extends Module {
             log.warn("skip call libxloader's initFunctions!");
             return;
         }
-        System.out.println("callInitFunction >>" + name);
         int index = 0;
         while (!initFunctionList.isEmpty()) {
             InitFunction initFunction = initFunctionList.remove(0);
