@@ -1,5 +1,6 @@
 package com.tdx.AndroidNew;
 
+import com.github.unidbg.AbstractEmulator;
 import com.github.unidbg.AndroidEmulator;
 import com.github.unidbg.Module;
 
@@ -15,6 +16,8 @@ import com.github.unidbg.memory.Memory;
 import com.github.unidbg.spi.InitFunction;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 
 import java.io.File;
@@ -22,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -143,7 +147,7 @@ public class NagaLoader {
 
         properties.setProperty("log4j.debug", "false");
         properties.setProperty("log4j.reset", "true");
-        properties.setProperty("log4j.rootLogger", "INFO, CONSOLE");
+        properties.setProperty("log4j.rootLogger", "INFO, CONSOLE"); // add "FILE" to enable File Appender
 
         properties.setProperty("log4j.appender.CONSOLE", "org.apache.log4j.ConsoleAppender");
         properties.setProperty("log4j.appender.Threshold", "DEBUG");
