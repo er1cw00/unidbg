@@ -27,31 +27,58 @@ public class CodeBranch {
     private long insOffset;
     private int cc;
     private Instruction ins;
-
-    private List<Integer> nzvcList = new ArrayList<Integer>();
-    private List<Integer> indexList = new ArrayList<Integer>();
+    int[] list = new int[2];
 
     public CodeBranch(long insOffset, long blockOffset, int cc, Instruction ins) {
         this.blkOffset = blockOffset;
         this.insOffset = insOffset;
         this.cc = cc;
         this.ins = ins;
+        this.list[0] = 0;
+        this.list[1] = 0;
+
     }
     public long getBlkOffset() {return blkOffset;}
     public long getInsOffset() {return insOffset;}
     public int getCC() {return cc;}
-    public int size() {return indexList.size();}
-    public Pair<Integer, Integer> get(int i) {
-        int idx = indexList.get(i);
-        int nzvc = nzvcList.get(i);
-        Pair<Integer, Integer> pair = new Pair<>(idx, nzvc);
-        return pair;
+    public int size() {
+        int s = 0;
+        if (list[0] != 0) {
+            if (list[1] != 0) {
+                return 2;
+            }
+            return 1;
+        }
+        return 0;
     }
-    public void add(int index, int nzvc) {
-        nzvcList.add(nzvc);
-        indexList.add(index);
+    public int get(int i) {
+        return list[i];
     }
-    static public String nzvcLabel(int nzvc) {
+    public void set(int index, int value) {
+        list[index] = value;
+    }
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("\t\"blkOffset\": \"0x").append(Long.toHexString(blkOffset)).append("\", \n");
+        sb.append("\t\"insOffset\": \"0x").append(Long.toHexString(insOffset)).append("\", \n");
+        sb.append("\t\"cc\": \"").append(CodeBranch.ccLabel(getCC())).append("\", \n");
+        int length = size();
+        if (length > 0) {
+            sb.append("\t\"branch\": [");
+            for (int i = 0; i < length; i++) {
+                int b = list[i];
+                sb.append(Integer.toString(b));
+                if (i + 1 < length) {
+                    sb.append(",");
+                }
+            }
+            sb.append("]\n");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+    static public String nzcvLabel(int nzvc) {
         String label = "";
         if (getBit(nzvc, N_BIT) != 0) {
             label = "N";

@@ -89,18 +89,15 @@ public class CodeBlock {
 
             int length = branch.size();
             if (length > 0) {
-                sb.append("\t\t\"list\": [\n");
+                sb.append("\t\t\"list\": [");
                 for (int i = 0; i < length; i++) {
-                    Pair<Integer, Integer> pair = branch.get(i);
-                    int idx = pair.getLeft().intValue();
-                    int nzvc = pair.getRight().intValue();
-                    sb.append("\t\t\t{\"index\": " + idx +", \"nzvc\": " + CodeBranch.nzvcLabel(pair.getRight()) + ", \"result\": " + CodeBranch.checkBranch(branch.getCC(), nzvc) +"}");
+                    int b = branch.get(i);
+                    sb.append(b);
                     if (i + 1 < length) {
                         sb.append(",");
                     }
-                    sb.append("\n");
                 }
-                sb.append("\t\t]\n");
+                sb.append("]\n");
             }
             sb.append("\t}");
         }

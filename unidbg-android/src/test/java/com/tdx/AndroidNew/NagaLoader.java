@@ -65,7 +65,8 @@ public class NagaLoader {
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         // libxloader.si total size : 0x2063FF
 //        initRootfs();
-        memory.disableCallInitFunction();
+
+//        memory.disableCallInitFunction();
         NagaHooker blkHooker = new NagaHooker("init", emulator, base);
         blkHooker.hook(0x3CFB8, 0x3D450);
 //        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
@@ -75,29 +76,27 @@ public class NagaLoader {
         DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
         List<InitFunction> funcs = module.getInitFunctions();
+        List<String> tagList = new ArrayList<>();
         System.out.println("module base:" + Long.toHexString(module.base) + ",init func:" + funcs.size());
 
-//        InitFunction func = funcs.get(0);
-//        for(int i = 0; i < 1; i++) {
-//            String tag = "Tag" + i;
-//            blkHooker.resetTag(tag);
-//            func.call(emulator);
+
+        InitFunction func = funcs.get(0);
+        blkHooker.resetTag("main");
+        tagList.add("main");
+        func.call(emulator);
+        int i = 0;
+        for(i = 0; i < 10 && !blkHooker.isStop(); i++) {
+            String tag = "Tag" + i;
+            tagList.add("tag");
+            System.out.println("call func with tag: " + tag + " >>>>>>");
+            blkHooker.resetTag(tag);
+            func.call(emulator);
 //            blkHooker.save(tag);
-//        }
-        blkHooker.save("main");
-        //blkHooker.saveTracker();
+        }
+        blkHooker.generateCallStack(tagList);
 
-
-//
-//        //dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-//        blkHooker.resetTag("main");
-//        module.invokeInitFunctions(emulator);
-//        blkHooker.save("main");
-        System.out.println(">>>>>>>");
-
-//        blkHooker.resetTag("branch");
-//        module.invokeInitFunctions(emulator);
-//        blkHooker.save("branch");
+//        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
+        System.out.println(">>>>>>> i:"+i);
     }
     private void destroy() {
         try {
@@ -164,5 +163,6 @@ public class NagaLoader {
 //        Logger.getLogger("com.github.unidbg.linux.AndroidElfLoader").setLevel(Level.DEBUG);
 //        Logger.getLogger("com.github.unidbg.linux.libxloader.so").setLevel(Level.DEBUG);
 //        Logger.getLogger("com.github.unidbg.linux.LinuxModule").setLevel(Level.DEBUG);
+        Logger.getLogger("com.github.unidbg.linux.ARM64SyscallHandler").setLevel(Level.DEBUG);
     }
 }

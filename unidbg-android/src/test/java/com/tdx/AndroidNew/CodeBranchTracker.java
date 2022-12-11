@@ -9,6 +9,7 @@ public class CodeBranchTracker {
     private List<Long> stack = new ArrayList<Long>();
     private Map<Long, CodeBranch> map = new TreeMap<Long, CodeBranch>();
     public CodeBranchTracker() {
+
     }
     public int size() {
         return stack.size();
@@ -20,18 +21,29 @@ public class CodeBranchTracker {
         Long offset = stack.get(i);
         return map.get(offset);
     }
+    public boolean isLast(CodeBranch branch) {
+        Long blkOffset = branch.getBlkOffset();
+        int last = stack.size() - 1;
+        if (last >= 0) {
+            Long lastOffset = stack.get(last);
+            if (lastOffset.equals(blkOffset)) {
+                return true;
+            }
+        }
+        return false;
+    }
     public void add(CodeBranch branch) {
-        Long offset = branch.getInsOffset();
+        Long offset = branch.getBlkOffset();
         CodeBranch v = map.get(offset);
         if (v != null) {
             throw new RuntimeException("CodeBranch is exist!");
+//            return;
         }
         map.put(offset, branch);
     }
-    public int push(Long offset) {
-        int i = stack.size();
-        stack.add(offset);
-        return i;
+    public void push(CodeBranch branch) {
+        Long blkOffset = branch.getBlkOffset();
+        stack.add(blkOffset);
     }
     public void pop() {
         int last = stack.size() - 1;
@@ -39,5 +51,14 @@ public class CodeBranchTracker {
             stack.remove(last);
         }
     }
-
+    public int findRing(long blkOffset) {
+//        int last = stack.size() - 1;
+//        for (int i = last; i >= 0; i--) {
+//            CodeBranch b = stack.get(i);
+//            if (b.getBlkOffset() == blkOffset) {
+//                return i;
+//            }
+//        }
+        return -1;
+    }
 }

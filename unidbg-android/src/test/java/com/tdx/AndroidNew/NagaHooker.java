@@ -5,10 +5,16 @@ import com.github.unidbg.arm.backend.Backend;
 import com.github.unidbg.arm.backend.BlockHook;
 import com.github.unidbg.arm.backend.CodeHook;
 import com.github.unidbg.arm.backend.UnHook;
+import com.github.unidbg.spi.AbstractLoader;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
@@ -16,32 +22,39 @@ import unicorn.Arm64Const;
 
 public class NagaHooker {
 
-
+    private static final Log log = LogFactory.getLog(NagaHooker.class);
     private AndroidEmulator emulator = null;
     private long base = 0;
     private long start = 0;
     private long end = 0;
     private String funcName;
     private String mTag = "main";
+    private Long currentBlock;
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
-
+    private ArrayList<Long> runAddr = new ArrayList<Long>();
+    private boolean printW8 = false;
     public NagaHooker(String funcName, AndroidEmulator emulator, long base) {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
         resetTag("main");
     }
+    public boolean isStop() {
+        return branchTracker.size() == 0;
+    }
     public void resetTag(String tag) {
         mTag = tag;
         this.blockList.resetList(tag);
+        log.warn("branchTracker.size:"+ branchTracker.size());
     }
     public void hook(long start, long end) {
         this.start = start;
         this.end = end;
         hookBlock(start, end);
-        //hookCode(start,end);
+        hookCode(start, end);
+        //hookCode(0, 0x76f48);
     }
     public void saveBlock() {
         System.out.println("save blocks: " + blockMap.size());
@@ -101,7 +114,7 @@ public class NagaHooker {
             @Override
             public void hookBlock(Backend backend, long address, int size, Object user) {
                 trackBlock(backend, address, size);
-                logBlock(address, size);
+                //logBlock(address, size);
             }
             @Override
             public void onAttach(UnHook unHook) {
@@ -126,11 +139,11 @@ public class NagaHooker {
             private UnHook unHook;
             @Override
             public void hook(Backend backend, long address, int size, Object user) {
-                //打印当前地址。这里要把unidbg使用的基址给去掉。
-//                if (!mTag.equals("branch")) {
-//                    return;
-//                }
-
+                if (printW8) {
+                    int w8 = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_W8).intValue();
+                    log.info("W8 reg:" + Integer.toHexString(w8));
+                    printW8 = false;
+                }
                 trackCode(backend, address, size);
             }
             @Override
@@ -153,10 +166,13 @@ public class NagaHooker {
     }
     private void trackCode(Backend backend, long address, int size) {
         long offset = address - base;
-        CodeBlock block = blockMap.searchBlock(offset);
+
+        CodeBlock block = blockMap.findBlock(currentBlock);
         if (block == null) {
+            log.warn("can not find current blk: " + Long.toHexString(currentBlock));
             return;
         }
+
         if (block.getType() != CodeBlockType.USED) {
             return;
         }
@@ -178,10 +194,6 @@ public class NagaHooker {
             throw new RuntimeException("Track Code [" + ins.toString() + "] Operand is empty!");
         }
 
-        System.out.println("trackCode:" + Long.toHexString(offset) +
-                           ",blk:" + Long.toHexString(block.getOffset()) +
-                           "," + ins.getMnemonic() +
-                           " " + ins.getOpStr());
         int reg1 = ins.mapToUnicornReg(ops[0].getValue().getReg());
         int reg2 = ins.mapToUnicornReg(ops[1].getValue().getReg());
         int reg3 = ins.mapToUnicornReg(ops[2].getValue().getReg());
@@ -198,18 +210,57 @@ public class NagaHooker {
 //                                ",wy:" + Integer.toHexString(wy) +
 //                                ",nzvc:" + Integer.toHexString(nzcv));
 
-        CodeBranch branch = branchTracker.getByOffset(offset);
+//
+        boolean result = CodeBranch.checkBranch(cc, nzcv);
+        log.info("trackCode:" + Long.toHexString(offset) +
+                ",blk:" + Long.toHexString(block.getOffset()) +
+                ",result:" + (result ? 1 : 2) +
+                "," + ins.getMnemonic() +
+                " " + ins.getOpStr() +
+                ",W8:" + Integer.toHexString(w8) +
+                ",Wx:" + Integer.toHexString(wx) +
+                ",Wy:" + Integer.toHexString(wy) +
+                ",nzvc:" + Integer.toHexString(nzcv) + ","+ CodeBranch.nzcvLabel(nzcv));
+
+        CodeBranch branch = branchTracker.getByOffset(blkOffset);
         if (branch == null) {
             branch = new CodeBranch(offset, blkOffset, cc, ins);
+            branch.set(0, result ? 1 : 2);
+            log.info("new branch :" + branch);
             branchTracker.add(branch);
+            branchTracker.push(branch);
+        } else {
+            if (branchTracker.isLast(branch)) {
+                if (branch.size() == 1) {
+                    int b = branch.get(0);
+                    if (b == 1) {
+                        branch.set(1, 2);
+                    } else if (b == 2) {
+                        branch.set(1, 1);
+                    }
+                    emulator.getBackend().reg_write(reg2, wy);
+                    emulator.getBackend().reg_write(reg3, wx);
+                    branchTracker.pop();
+                    log.info("find last branch need change:" + branch);
+                }
+            } else {
+                int s = branch.size();
+                if (s == 2) { // find ring, break;
+                    log.warn("find Ring BlkOffset:" + Long.toHexString(blkOffset) + "; " +
+                            "branch: " + branch);
+
+                } else if (s == 1) {
+                    // 按照之前的分支运行
+                    log.info("find branch run as previous:" + branch);
+                }
+            }
         }
-        int index = branchTracker.push(offset);
-        //System.out.println("branch stack:"+index+",cc:"+nzcv);
-        branch.add(index,nzcv);
+        printW8 = true;
         return;
     }
     private void trackBlock(Backend backend, long address, int size) {
         long offset = address - base;
+        currentBlock = offset;
         CodeBlock block = blockMap.findBlock(offset);
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
@@ -234,6 +285,35 @@ public class NagaHooker {
 //                                            ",ops:" + ins.getOpStr() +
 //                                            ",addr:" + Long.toHexString(ins.getAddress()) +
 //                                            "]");
+    }
+    public void saveRunAddress() {
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir+"/offset.txt");
+        try {
+            file.createNewFile();
+            FileWriter writer =new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            for(Long offset : runAddr) {
+                bufferedWriter.write("0x"+Long.toHexString(offset)+"\r\n");
+            }
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
+        }
+        System.out.println("write run offset to " + file.getAbsoluteFile());
+    }
+    public void generateCallStack(List<String> tagList) {
+        for (String tag : tagList) {
+            int length = blockList.size(tag);
+            for (int i = 0; i < length; i++) {
+                Long off = blockList.get(tag, i);
+                CodeBlock blk = blockMap.findBlock(off);
+                if (blk == null) {
+                    continue;
+                }
+            }
+        }
     }
 /*
     public boolean scanBlock(int prefix) {
