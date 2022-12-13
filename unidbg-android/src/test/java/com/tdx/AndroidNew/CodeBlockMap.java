@@ -3,12 +3,16 @@ package com.tdx.AndroidNew;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class CodeBlockMap {
     private Map<Long, CodeBlock> blockMap = new TreeMap<Long, CodeBlock>();
     private List<Long> blockList = new ArrayList<>();
 
+    public Set<Long> keySets() {
+        return blockMap.keySet();
+    }
     public int size() {
         return blockMap.size();
     }

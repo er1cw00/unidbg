@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
@@ -30,6 +31,7 @@ public class NagaHooker {
     private String funcName;
     private String mTag = "main";
     private Long currentBlock;
+    private Long startBlock;
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
@@ -39,6 +41,7 @@ public class NagaHooker {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
+        this.startBlock = 0L;
         resetTag("main");
     }
     public boolean isStop() {
@@ -71,7 +74,7 @@ public class NagaHooker {
             for (int i = 0; i < branchTracker.size(); i++) {
                 CodeBranch branch = branchTracker.getByIndex(i);
                 CodeBlock blk = blockMap.findBlock(branch.getBlkOffset());
-                bufferedWriter.write(blk.toString(branch));
+                bufferedWriter.write(blk.toString());
                 if (i + 1 < branchTracker.size()) {
                     bufferedWriter.write(",\n");
                 }
@@ -96,7 +99,7 @@ public class NagaHooker {
             for (int i = 0; i < blockList.size(tag); i++) {
                 Long offset = blockList.get(tag, i);
                 CodeBlock blk = blockMap.findBlock(offset);
-                bufferedWriter.write(blk.toString(null));
+                bufferedWriter.write(blk.toString());
                 if (i + 1 < blockList.size(tag)) {
                     bufferedWriter.write(",\n");
                 }
@@ -261,6 +264,9 @@ public class NagaHooker {
     private void trackBlock(Backend backend, long address, int size) {
         long offset = address - base;
         currentBlock = offset;
+        if (startBlock == 0) {
+            startBlock = offset;
+        }
         CodeBlock block = blockMap.findBlock(offset);
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
@@ -305,17 +311,59 @@ public class NagaHooker {
     }
     public void generateCallStack(List<String> tagList) {
         for (String tag : tagList) {
+            CodeBlock last = null;
             int length = blockList.size(tag);
             for (int i = 0; i < length; i++) {
                 Long off = blockList.get(tag, i);
                 CodeBlock blk = blockMap.findBlock(off);
-                if (blk == null) {
+                if (blk == null || blk.getType() != CodeBlockType.USED) {
                     continue;
                 }
+                if (last != null) {
+                    last.addBranch(off);
+                }
+                last = blk;
             }
+        }
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir+"/blocks.txt");
+        try {
+            file.createNewFile();
+            FileWriter writer =new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            bufferedWriter.write("[\n");
+            Long[] keys = blockMap.keySets().toArray(new Long[blockMap.size()]);
+            int s = keys.length;
+            for (int i = 0; i < s; i++) {
+                Long off = keys[i];
+                CodeBlock block = blockMap.findBlock(off);
+                if (block.getType() == CodeBlockType.FAKE) {
+                    continue;
+                }
+                bufferedWriter.write(block.toString());
+                if (i + 1 < s) {
+                    bufferedWriter.write(",\n");
+                }
+            }
+            bufferedWriter.write("]\n");
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
         }
     }
 /*
+
+            for (int i = 0; i < branchTracker.size(); i++) {
+                CodeBranch branch = branchTracker.getByIndex(i);
+                CodeBlock blk = blockMap.findBlock(branch.getBlkOffset());
+                bufferedWriter.write(blk.toString());
+                if (i + 1 < branchTracker.size()) {
+                    bufferedWriter.write(",\n");
+                }
+            }
+
+
     public boolean scanBlock(int prefix) {
         if (prefix > blockList.size()) {
             return false;

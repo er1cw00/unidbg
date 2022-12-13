@@ -17,12 +17,14 @@ public class CodeBlock {
     private long base;
     private CodeBlockType type;
     private List<Instruction> instruction;
+    private List<Long> branchs;
 
     public CodeBlock(long base, long offset, Instruction[] insns) {
         this.ref = 0;
         this.base = base;
         this.offset = offset;
         this.instruction = Arrays.asList(insns);//new ArrayList<Instruction>(insns);
+        this.branchs = new ArrayList<Long>(2);
         this.type = CodeBlockType.UNKNOWN;
     }
     public void addRef() {
@@ -75,32 +77,56 @@ public class CodeBlock {
 //        }
         return CodeBlockType.USED;
     }
-
-    public String toString(CodeBranch branch) {
+    public int branchSize() {
+        return branchs.size();
+    }
+    public Long getBranch(int i) {
+        return branchs.get(i);
+    }
+    public void addBranch(Long offset) {
+        for (Long off : branchs) {
+            if (off.equals(offset)) {
+                return;
+            }
+        }
+        branchs.add(offset);
+    }
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("\t\"type\": \"").append(type).append("\", \n");
         sb.append("\t\"offset\": \"0x").append(Long.toHexString(offset)).append("\", \n");
-
-        if (branch != null) {
-            sb.append("\t\"branch\": {\n").append(", \n");
-            sb.append("\t\t\"offset\": \"").append(Long.toHexString(branch.getInsOffset())).append("\", \n");
-            sb.append("\t\t\"cc\": \"").append(CodeBranch.ccLabel(branch.getCC())).append("\", \n");
-
-            int length = branch.size();
-            if (length > 0) {
-                sb.append("\t\t\"list\": [");
-                for (int i = 0; i < length; i++) {
-                    int b = branch.get(i);
-                    sb.append(b);
-                    if (i + 1 < length) {
-                        sb.append(",");
-                    }
-                }
-                sb.append("]\n");
+        int s = branchs.size();
+        if (s > 0) {
+            sb.append("\t\"branchs\": [");
+            for (int i = 0; i < s; i++) {
+                Long off = branchs.get(i);
+                sb.append(Long.toHexString(off));
+                if (i + 1 < s) {
+                   sb.append(",");
+               }
             }
-            sb.append("\t}");
+            sb.append("]\n");
         }
+//        if (branch != null) {
+//            sb.append("\t\"branch\": {\n").append(", \n");
+//            sb.append("\t\t\"offset\": \"").append(Long.toHexString(branch.getInsOffset())).append("\", \n");
+//            sb.append("\t\t\"cc\": \"").append(CodeBranch.ccLabel(branch.getCC())).append("\", \n");
+//
+//            int length = branch.size();
+//            if (length > 0) {
+//                sb.append("\t\t\"list\": [");
+//                for (int i = 0; i < length; i++) {
+//                    int b = branch.get(i);
+//                    sb.append(b);
+//                    if (i + 1 < length) {
+//                        sb.append(",");
+//                    }
+//                }
+//                sb.append("]\n");
+//            }
+//            sb.append("\t}");
+//        }
         int length = this.instruction.size();
         if (length > 0) {
             sb.append("\t\"ins\": [\n");

@@ -87,7 +87,7 @@ public class NagaLoader {
         int i = 0;
         for(i = 0; i < 10 && !blkHooker.isStop(); i++) {
             String tag = "Tag" + i;
-            tagList.add("tag");
+            tagList.add(tag);
             System.out.println("call func with tag: " + tag + " >>>>>>");
             blkHooker.resetTag(tag);
             func.call(emulator);

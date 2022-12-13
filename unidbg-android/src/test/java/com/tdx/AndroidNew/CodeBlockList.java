@@ -31,7 +31,7 @@ public class CodeBlockList {
     public int size(String tag) {
         ArrayList<Long> list = mListMap.get(tag);
         if (list == null) {
-            throw new RuntimeException("Codeblock List have not create!");
+            throw new RuntimeException("Codeblock List have not create! " + tag);
         }
         return list.size();
     }
