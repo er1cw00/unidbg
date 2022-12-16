@@ -32,6 +32,7 @@ public class NagaHooker {
     private String mTag = "main";
     private Long currentBlock;
     private Long startBlock;
+    private Long lastUsedBlock;
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
@@ -42,6 +43,8 @@ public class NagaHooker {
         this.emulator = emulator;
         this.base = base;
         this.startBlock = 0L;
+        this.currentBlock = 0L;
+        this.lastUsedBlock = 0L;
         resetTag("main");
     }
     public boolean isStop() {
@@ -50,6 +53,7 @@ public class NagaHooker {
     public void resetTag(String tag) {
         mTag = tag;
         this.blockList.resetList(tag);
+        this.lastUsedBlock = 0L;
         log.warn("branchTracker.size:"+ branchTracker.size());
     }
     public void hook(long start, long end) {
@@ -144,7 +148,7 @@ public class NagaHooker {
             public void hook(Backend backend, long address, int size, Object user) {
                 if (printW8) {
                     int w8 = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_W8).intValue();
-                    log.info("W8 reg:" + Integer.toHexString(w8));
+                    //log.info("W8 reg:" + Integer.toHexString(w8));
                     printW8 = false;
                 }
                 trackCode(backend, address, size);
@@ -215,20 +219,20 @@ public class NagaHooker {
 
 //
         boolean result = CodeBranch.checkBranch(cc, nzcv);
-        log.info("trackCode:" + Long.toHexString(offset) +
-                ",blk:" + Long.toHexString(block.getOffset()) +
-                ",result:" + (result ? 1 : 2) +
-                "," + ins.getMnemonic() +
-                " " + ins.getOpStr() +
-                ",W8:" + Integer.toHexString(w8) +
-                ",Wx:" + Integer.toHexString(wx) +
-                ",Wy:" + Integer.toHexString(wy) +
-                ",nzvc:" + Integer.toHexString(nzcv) + ","+ CodeBranch.nzcvLabel(nzcv));
+//        log.info("trackCode:" + Long.toHexString(offset) +
+//                ",blk:" + Long.toHexString(block.getOffset()) +
+//                ",result:" + (result ? 1 : 2) +
+//                "," + ins.getMnemonic() +
+//                " " + ins.getOpStr() +
+//                ",W8:" + Integer.toHexString(w8) +
+//                ",Wx:" + Integer.toHexString(wx) +
+//                ",Wy:" + Integer.toHexString(wy) +
+//                ",nzvc:" + Integer.toHexString(nzcv) + ","+ CodeBranch.nzcvLabel(nzcv));
 
         CodeBranch branch = branchTracker.getByOffset(blkOffset);
         if (branch == null) {
             branch = new CodeBranch(offset, blkOffset, cc, ins);
-            branch.set(0, result ? 1 : 2);
+            branch.set(0, result ? CodeBlock.CC_TRUE : CodeBlock.CC_FALSE);
             log.info("new branch :" + branch);
             branchTracker.add(branch);
             branchTracker.push(branch);
@@ -236,10 +240,10 @@ public class NagaHooker {
             if (branchTracker.isLast(branch)) {
                 if (branch.size() == 1) {
                     int b = branch.get(0);
-                    if (b == 1) {
-                        branch.set(1, 2);
-                    } else if (b == 2) {
-                        branch.set(1, 1);
+                    if (b == CodeBlock.CC_TRUE) {
+                        branch.set(1, CodeBlock.CC_FALSE);
+                    } else if (b == CodeBlock.CC_FALSE) {
+                        branch.set(1, CodeBlock.CC_TRUE);
                     }
                     emulator.getBackend().reg_write(reg2, wy);
                     emulator.getBackend().reg_write(reg3, wx);
@@ -276,6 +280,25 @@ public class NagaHooker {
             block.addRef();
         }
         blockList.add(mTag, offset);
+        if (block.getType() == CodeBlockType.USED) {
+            logBlock(address, size);
+            if (lastUsedBlock != 0) {
+                CodeBlock lastBlock = blockMap.findBlock(lastUsedBlock);
+                CodeBranch lastBranch = branchTracker.getByOffset(lastUsedBlock);
+                if (lastBlock != null) {
+                    int type = CodeBlock.CC_NONE;
+                    if (lastBranch != null) {
+                        type = lastBranch.getLast();
+                    }
+                    try {
+                        lastBlock.putBranch(type, offset);
+                    } catch (Exception e) {
+                        log.error("exception when put branch: " + e);
+                    }
+                }
+            }
+            lastUsedBlock = block.getOffset();
+        }
     }
     private void logBlock(long address, int size) {
         long offset = address - base;
@@ -310,21 +333,21 @@ public class NagaHooker {
         System.out.println("write run offset to " + file.getAbsoluteFile());
     }
     public void generateCallStack(List<String> tagList) {
-        for (String tag : tagList) {
-            CodeBlock last = null;
-            int length = blockList.size(tag);
-            for (int i = 0; i < length; i++) {
-                Long off = blockList.get(tag, i);
-                CodeBlock blk = blockMap.findBlock(off);
-                if (blk == null || blk.getType() != CodeBlockType.USED) {
-                    continue;
-                }
-                if (last != null) {
-                    last.addBranch(off);
-                }
-                last = blk;
-            }
-        }
+//        for (String tag : tagList) {
+//            CodeBlock last = null;
+//            int length = blockList.size(tag);
+//            for (int i = 0; i < length; i++) {
+//                Long off = blockList.get(tag, i);
+//                CodeBlock blk = blockMap.findBlock(off);
+//                if (blk == null || blk.getType() != CodeBlockType.USED) {
+//                    continue;
+//                }
+//                if (last != null) {
+//                    last.addBranch(off);
+//                }
+//                last = blk;
+//            }
+//        }
         String rootDir = emulator.getFileSystem().getRootDir().toString();
         File file = new File(rootDir+"/blocks.txt");
         try {

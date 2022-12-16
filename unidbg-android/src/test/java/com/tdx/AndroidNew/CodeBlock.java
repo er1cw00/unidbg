@@ -4,7 +4,9 @@ import net.dongliu.apk.parser.utils.Pair;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
@@ -12,19 +14,22 @@ import capstone.api.RegsAccess;
 import unicorn.Arm64Const;
 
 public class CodeBlock {
+    public static Integer CC_NONE = 0;
+    public static Integer CC_TRUE = 1;
+    public static Integer CC_FALSE = 2;
     private int ref;
     private long offset;
     private long base;
     private CodeBlockType type;
     private List<Instruction> instruction;
-    private List<Long> branchs;
+    private Map<Integer, Long> branch;
 
     public CodeBlock(long base, long offset, Instruction[] insns) {
         this.ref = 0;
         this.base = base;
         this.offset = offset;
         this.instruction = Arrays.asList(insns);//new ArrayList<Instruction>(insns);
-        this.branchs = new ArrayList<Long>(2);
+        this.branch = new HashMap<>();
         this.type = CodeBlockType.UNKNOWN;
     }
     public void addRef() {
@@ -78,33 +83,44 @@ public class CodeBlock {
         return CodeBlockType.USED;
     }
     public int branchSize() {
-        return branchs.size();
+        return branch.size();
     }
-    public Long getBranch(int i) {
-        return branchs.get(i);
+    public Long getBranch(int type) {
+        return branch.get(type);
     }
-    public void addBranch(Long offset) {
-        for (Long off : branchs) {
-            if (off.equals(offset)) {
-                return;
+    public void putBranch(int type, Long val) {
+        Long off = branch.get(type);
+        System.out.println("put branch <" + type + "," + Long.toHexString(val) + ">" +
+                         " for block " + Long.toHexString(offset));
+        if (off != null) {
+            if (!off.equals(val)) {
+                throw new RuntimeException("try to replace branch <" + type + "," + Long.toHexString(off) + ">" +
+                                            " for block " + Long.toHexString(offset) +
+                                            " with " + Long.toHexString(val));
             }
+            return;
         }
-        branchs.add(offset);
+        branch.put(type, val);
     }
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
-        sb.append("\t\"type\": \"").append(type).append("\", \n");
-        sb.append("\t\"offset\": \"0x").append(Long.toHexString(offset)).append("\", \n");
-        int s = branchs.size();
+        sb.append("\t\'type\': \'").append(type).append("\', \n");
+        sb.append("\t\'offset\': \'0x").append(Long.toHexString(offset)).append("\', \n");
+        int s = branch.size();
         if (s > 0) {
             sb.append("\t\"branchs\": [");
-            for (int i = 0; i < s; i++) {
-                Long off = branchs.get(i);
-                sb.append(Long.toHexString(off));
+            int i = 0;
+            for (Integer key : branch.keySet()) {
+                Long off = branch.get(key);
+                sb.append("\t\t{");
+                sb.append("\'" + key + "\': \'0x").append(Long.toHexString(off)).append("\'");
+                sb.append("}");
                 if (i + 1 < s) {
-                   sb.append(",");
-               }
+                    sb.append(",");
+                }
+                sb.append("\n");
+                i += 1;
             }
             sb.append("]\n");
         }
@@ -129,12 +145,12 @@ public class CodeBlock {
 //        }
         int length = this.instruction.size();
         if (length > 0) {
-            sb.append("\t\"ins\": [\n");
+            sb.append("\t\'ins\': [\n");
             for (int i = 0; i < length; i++) {
                 Instruction ins = this.instruction.get(i);
-                sb.append("\t\t\"0x" + Long.toHexString(ins.getAddress() - base) +
+                sb.append("\t\t\'0x" + Long.toHexString(ins.getAddress() - base) +
                         "   " + bytesToString(ins.getBytes()) +
-                        "   " + ins.toString() + "\"");
+                        "   " + ins.toString() + "\'");
                 if (i + 1 < length) {
                     sb.append(",");
                 }

@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class CodeBlockList {
+    private Map<Long, Integer> branch = new HashMap<Long, Integer>();
     private Map<String, ArrayList<Long>> mListMap = new HashMap<String, ArrayList<Long>>();
     public void resetList(String tag) {
         ArrayList<Long> list = mListMap.get(tag);
@@ -34,5 +35,11 @@ public class CodeBlockList {
             throw new RuntimeException("Codeblock List have not create! " + tag);
         }
         return list.size();
+    }
+    public void putCC(Long off, int cc) {
+        branch.put(off, cc);
+    }
+    public Integer getCC(Long off) {
+        return branch.get(off);
     }
 }

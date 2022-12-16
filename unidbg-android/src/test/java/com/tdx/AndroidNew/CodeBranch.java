@@ -57,6 +57,15 @@ public class CodeBranch {
     public void set(int index, int value) {
         list[index] = value;
     }
+    public int getLast() {
+        if (list[0] != 0) {
+            if (list[1] != 0) {
+                return list[1];
+            }
+            return list[0];
+        }
+        return 0;
+    }
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
