@@ -20,16 +20,18 @@ public class CodeBlock {
     private int ref;
     private long offset;
     private long base;
+    private boolean start;
     private CodeBlockType type;
     private List<Instruction> instruction;
     private Map<Integer, Long> branch;
 
-    public CodeBlock(long base, long offset, Instruction[] insns) {
+    public CodeBlock(boolean start, long base, long offset, Instruction[] insns) {
         this.ref = 0;
         this.base = base;
         this.offset = offset;
         this.instruction = Arrays.asList(insns);//new ArrayList<Instruction>(insns);
         this.branch = new HashMap<>();
+        this.start = start;
         this.type = CodeBlockType.UNKNOWN;
     }
     public void addRef() {
@@ -90,8 +92,8 @@ public class CodeBlock {
     }
     public void putBranch(int type, Long val) {
         Long off = branch.get(type);
-        System.out.println("put branch <" + type + "," + Long.toHexString(val) + ">" +
-                         " for block " + Long.toHexString(offset));
+//        System.out.println("put branch <" + type + "," + Long.toHexString(val) + ">" +
+//                         " for block " + Long.toHexString(offset));
         if (off != null) {
             if (!off.equals(val)) {
                 throw new RuntimeException("try to replace branch <" + type + "," + Long.toHexString(off) + ">" +
@@ -105,24 +107,29 @@ public class CodeBlock {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
-        sb.append("\t\'type\': \'").append(type).append("\', \n");
-        sb.append("\t\'offset\': \'0x").append(Long.toHexString(offset)).append("\', \n");
+        sb.append("\t\"type\": \"").append(type).append("\", \n");
+        if (this.start) {
+            sb.append("\t\"start\": true,\n");
+        }
+        sb.append("\t\"offset\": \"0x").append(Long.toHexString(offset)).append("\", \n");
         int s = branch.size();
         if (s > 0) {
-            sb.append("\t\"branchs\": [");
+            sb.append("\t\"branchs\": [\n");
             int i = 0;
             for (Integer key : branch.keySet()) {
                 Long off = branch.get(key);
-                sb.append("\t\t{");
-                sb.append("\'" + key + "\': \'0x").append(Long.toHexString(off)).append("\'");
-                sb.append("}");
+                sb.append("\t\t{")
+                    .append("\"branch\": " + key + ", \"offset\": \"0x")
+                    .append(Long.toHexString(off))
+                    .append("\"")
+                    .append("}");
                 if (i + 1 < s) {
                     sb.append(",");
                 }
                 sb.append("\n");
                 i += 1;
             }
-            sb.append("]\n");
+            sb.append("\t],\n");
         }
 //        if (branch != null) {
 //            sb.append("\t\"branch\": {\n").append(", \n");
@@ -145,12 +152,12 @@ public class CodeBlock {
 //        }
         int length = this.instruction.size();
         if (length > 0) {
-            sb.append("\t\'ins\': [\n");
+            sb.append("\t\"ins\": [\n");
             for (int i = 0; i < length; i++) {
                 Instruction ins = this.instruction.get(i);
-                sb.append("\t\t\'0x" + Long.toHexString(ins.getAddress() - base) +
+                sb.append("\t\t\"0x" + Long.toHexString(ins.getAddress() - base) +
                         "   " + bytesToString(ins.getBytes()) +
-                        "   " + ins.toString() + "\'");
+                        "   " + ins.toString() + "\"");
                 if (i + 1 < length) {
                     sb.append(",");
                 }

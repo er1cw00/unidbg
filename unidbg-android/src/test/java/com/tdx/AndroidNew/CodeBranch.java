@@ -26,6 +26,7 @@ public class CodeBranch {
     private long blkOffset;
     private long insOffset;
     private int cc;
+    private int last;
     private Instruction ins;
     int[] list = new int[2];
 
@@ -34,6 +35,7 @@ public class CodeBranch {
         this.insOffset = insOffset;
         this.cc = cc;
         this.ins = ins;
+        this.last = 0;
         this.list[0] = 0;
         this.list[1] = 0;
 
@@ -57,14 +59,11 @@ public class CodeBranch {
     public void set(int index, int value) {
         list[index] = value;
     }
+    public void setLast(int cc) {
+        last = cc;
+    }
     public int getLast() {
-        if (list[0] != 0) {
-            if (list[1] != 0) {
-                return list[1];
-            }
-            return list[0];
-        }
-        return 0;
+        return last;
     }
     public String toString() {
         StringBuilder sb = new StringBuilder();

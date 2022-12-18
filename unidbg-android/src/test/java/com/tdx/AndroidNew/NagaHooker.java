@@ -229,10 +229,12 @@ public class NagaHooker {
 //                ",Wy:" + Integer.toHexString(wy) +
 //                ",nzvc:" + Integer.toHexString(nzcv) + ","+ CodeBranch.nzcvLabel(nzcv));
 
+        int ccResult = result ? CodeBlock.CC_TRUE : CodeBlock.CC_FALSE;
         CodeBranch branch = branchTracker.getByOffset(blkOffset);
         if (branch == null) {
             branch = new CodeBranch(offset, blkOffset, cc, ins);
-            branch.set(0, result ? CodeBlock.CC_TRUE : CodeBlock.CC_FALSE);
+            branch.set(0, ccResult);
+            branch.setLast(ccResult);
             log.info("new branch :" + branch);
             branchTracker.add(branch);
             branchTracker.push(branch);
@@ -242,8 +244,10 @@ public class NagaHooker {
                     int b = branch.get(0);
                     if (b == CodeBlock.CC_TRUE) {
                         branch.set(1, CodeBlock.CC_FALSE);
+                        branch.setLast(CodeBlock.CC_FALSE);
                     } else if (b == CodeBlock.CC_FALSE) {
                         branch.set(1, CodeBlock.CC_TRUE);
+                        branch.setLast(CodeBlock.CC_TRUE);
                     }
                     emulator.getBackend().reg_write(reg2, wy);
                     emulator.getBackend().reg_write(reg3, wx);
@@ -260,6 +264,7 @@ public class NagaHooker {
                     // 按照之前的分支运行
                     log.info("find branch run as previous:" + branch);
                 }
+                branch.setLast(ccResult);
             }
         }
         printW8 = true;
@@ -267,14 +272,16 @@ public class NagaHooker {
     }
     private void trackBlock(Backend backend, long address, int size) {
         long offset = address - base;
+        boolean start = false;
         currentBlock = offset;
         if (startBlock == 0) {
             startBlock = offset;
+            start = true;
         }
         CodeBlock block = blockMap.findBlock(offset);
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
-            block = new CodeBlock(this.base, offset, insns);
+            block = new CodeBlock(start, this.base, offset, insns);
             blockMap.addBlock(block);
         } else {
             block.addRef();
