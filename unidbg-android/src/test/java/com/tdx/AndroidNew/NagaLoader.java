@@ -91,9 +91,9 @@ public class NagaLoader {
             System.out.println("call func with tag: " + tag + " >>>>>>");
             blkHooker.resetTag(tag);
             func.call(emulator);
-//            blkHooker.save(tag);
+            blkHooker.save(tag);
         }
-        blkHooker.generateCallStack(tagList);
+        blkHooker.generateCallStack();
 
 //        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         System.out.println(">>>>>>> i:"+i);

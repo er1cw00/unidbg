@@ -92,7 +92,7 @@ public class NagaHooker {
     }
     public void save(String tag) {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir + File.separator + this.funcName + "_"+ tag +"_block.txt" );
+        File file = new File(rootDir + File.separator + "log" + File.separator + this.funcName + "_"+ tag +"_block.txt" );
         System.out.println("save block track: " + file.getAbsoluteFile());
         try {
             System.out.printf("saveCodeBlock list size: " + blockList.size(tag) +",map size:" + blockMap.size() + "\n");
@@ -324,7 +324,7 @@ public class NagaHooker {
     }
     public void saveRunAddress() {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir+"/offset.txt");
+        File file = new File(rootDir+"/log/offset.txt");
         try {
             file.createNewFile();
             FileWriter writer =new FileWriter(file.getAbsoluteFile());
@@ -339,24 +339,10 @@ public class NagaHooker {
         }
         System.out.println("write run offset to " + file.getAbsoluteFile());
     }
-    public void generateCallStack(List<String> tagList) {
-//        for (String tag : tagList) {
-//            CodeBlock last = null;
-//            int length = blockList.size(tag);
-//            for (int i = 0; i < length; i++) {
-//                Long off = blockList.get(tag, i);
-//                CodeBlock blk = blockMap.findBlock(off);
-//                if (blk == null || blk.getType() != CodeBlockType.USED) {
-//                    continue;
-//                }
-//                if (last != null) {
-//                    last.addBranch(off);
-//                }
-//                last = blk;
-//            }
-//        }
+    public void generateCallStack() {
+
         String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir+"/blocks.txt");
+        File file = new File(rootDir+"/log/blocks.txt");
         try {
             file.createNewFile();
             FileWriter writer =new FileWriter(file.getAbsoluteFile());
