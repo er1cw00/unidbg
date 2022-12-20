@@ -84,6 +84,7 @@ public class NagaLoader {
         blkHooker.resetTag("main");
         tagList.add("main");
         func.call(emulator);
+        blkHooker.save("main");
         int i = 0;
         for(i = 0; i < 10 && !blkHooker.isStop(); i++) {
             String tag = "Tag" + i;
@@ -93,7 +94,7 @@ public class NagaLoader {
             func.call(emulator);
             blkHooker.save(tag);
         }
-        blkHooker.generateCallStack();
+        blkHooker.saveCallStack();
 
 //        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         System.out.println(">>>>>>> i:"+i);

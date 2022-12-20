@@ -63,58 +63,6 @@ public class NagaHooker {
         hookCode(start, end);
         //hookCode(0, 0x76f48);
     }
-    public void saveBlock() {
-        System.out.println("save blocks: " + blockMap.size());
-    }
-    public void saveTracker() {
-        String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir + File.separator + this.funcName +"_tk.txt" );
-        System.out.println("save track: " + file.getAbsoluteFile());
-        try {
-            file.createNewFile();
-            FileWriter writer = new FileWriter(file.getAbsoluteFile());
-            BufferedWriter bufferedWriter = new BufferedWriter(writer);
-            bufferedWriter.write("[\n");
-            for (int i = 0; i < branchTracker.size(); i++) {
-                CodeBranch branch = branchTracker.getByIndex(i);
-                CodeBlock blk = blockMap.findBlock(branch.getBlkOffset());
-                bufferedWriter.write(blk.toString());
-                if (i + 1 < branchTracker.size()) {
-                    bufferedWriter.write(",\n");
-                }
-            }
-            bufferedWriter.write("]\n");
-            bufferedWriter.close();
-            writer.close();
-        } catch (Exception e) {
-            System.out.printf("exception:\n" + e);
-        }
-    }
-    public void save(String tag) {
-        String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir + File.separator + "log" + File.separator + this.funcName + "_"+ tag +"_block.txt" );
-        System.out.println("save block track: " + file.getAbsoluteFile());
-        try {
-            System.out.printf("saveCodeBlock list size: " + blockList.size(tag) +",map size:" + blockMap.size() + "\n");
-            file.createNewFile();
-            FileWriter writer = new FileWriter(file.getAbsoluteFile());
-            BufferedWriter bufferedWriter = new BufferedWriter(writer);
-            bufferedWriter.write("[\n");
-            for (int i = 0; i < blockList.size(tag); i++) {
-                Long offset = blockList.get(tag, i);
-                CodeBlock blk = blockMap.findBlock(offset);
-                bufferedWriter.write(blk.toString());
-                if (i + 1 < blockList.size(tag)) {
-                    bufferedWriter.write(",\n");
-                }
-            }
-            bufferedWriter.write("]\n");
-            bufferedWriter.close();
-            writer.close();
-        } catch (Exception e) {
-            System.out.printf("exception:\n" + e);
-        }
-    }
     private void hookBlock(long start, long end) {
         this.emulator.getBackend().hook_add_new(new BlockHook() {
             private UnHook unHook;
@@ -324,7 +272,7 @@ public class NagaHooker {
     }
     public void saveRunAddress() {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir+"/log/offset.txt");
+        File file = new File(rootDir+"/log/"+funcName+"/offset.txt");
         try {
             file.createNewFile();
             FileWriter writer =new FileWriter(file.getAbsoluteFile());
@@ -339,10 +287,10 @@ public class NagaHooker {
         }
         System.out.println("write run offset to " + file.getAbsoluteFile());
     }
-    public void generateCallStack() {
+    public void saveCallStack() {
 
         String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir+"/log/blocks.txt");
+        File file = new File(rootDir + File.separator + "log" + File.separator +funcName+"_blocks.txt");
         try {
             file.createNewFile();
             FileWriter writer =new FileWriter(file.getAbsoluteFile());
@@ -358,6 +306,59 @@ public class NagaHooker {
                 }
                 bufferedWriter.write(block.toString());
                 if (i + 1 < s) {
+                    bufferedWriter.write(",\n");
+                }
+            }
+            bufferedWriter.write("]\n");
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
+        }
+    }
+
+    public void saveBlock() {
+        System.out.println("save blocks: " + blockMap.size());
+    }
+    public void saveTracker() {
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir + File.separator + "log" + File.separator + this.funcName +"_tk.txt" );
+        System.out.println("save track: " + file.getAbsoluteFile());
+        try {
+            file.createNewFile();
+            FileWriter writer = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            bufferedWriter.write("[\n");
+            for (int i = 0; i < branchTracker.size(); i++) {
+                CodeBranch branch = branchTracker.getByIndex(i);
+                CodeBlock blk = blockMap.findBlock(branch.getBlkOffset());
+                bufferedWriter.write(blk.toString());
+                if (i + 1 < branchTracker.size()) {
+                    bufferedWriter.write(",\n");
+                }
+            }
+            bufferedWriter.write("]\n");
+            bufferedWriter.close();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("exception:\n" + e);
+        }
+    }
+    public void save(String tag) {
+        String rootDir = emulator.getFileSystem().getRootDir().toString();
+        File file = new File(rootDir + File.separator + "log" + File.separator + this.funcName + "_"+ tag +"_block.txt" );
+        System.out.println("save block track: " + file.getAbsoluteFile());
+        try {
+            System.out.printf("saveCodeBlock list size: " + blockList.size(tag) +",map size:" + blockMap.size() + "\n");
+            file.createNewFile();
+            FileWriter writer = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+            bufferedWriter.write("[\n");
+            for (int i = 0; i < blockList.size(tag); i++) {
+                Long offset = blockList.get(tag, i);
+                CodeBlock blk = blockMap.findBlock(offset);
+                bufferedWriter.write(blk.toString());
+                if (i + 1 < blockList.size(tag)) {
                     bufferedWriter.write(",\n");
                 }
             }
