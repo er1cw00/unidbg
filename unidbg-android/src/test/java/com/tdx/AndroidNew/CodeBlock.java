@@ -45,6 +45,18 @@ public class CodeBlock {
     }
     public Long getOffset() {return this.offset;}
     public int getCount() {return this.instruction.size();}
+    public List<Long> getBlList() {
+        List<Long> l = new ArrayList<>();
+        int len = this.instruction.size();
+        for (int i = 0; i < len; i++) {
+            Instruction ins = this.instruction.get(i);
+            String m = ins.getMnemonic();
+            if (m.equals("bl") || m.equals("blr")) {
+                l.add(ins.getAddress());
+            }
+        }
+        return l;
+    }
     public Long getStart() {
         Instruction ins = this.instruction.get(0);
         return ins.getAddress() - this.base;

@@ -6,6 +6,8 @@ import com.github.unidbg.arm.backend.BlockHook;
 import com.github.unidbg.arm.backend.CodeHook;
 import com.github.unidbg.arm.backend.UnHook;
 import com.github.unidbg.spi.AbstractLoader;
+import com.github.unidbg.pointer.UnidbgPointer;
+import com.sun.jna.Pointer;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -19,6 +21,10 @@ import java.util.Set;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
+import keystone.Keystone;
+import keystone.KeystoneArchitecture;
+import keystone.KeystoneEncoded;
+import keystone.KeystoneMode;
 import unicorn.Arm64Const;
 
 public class NagaHooker {
@@ -38,6 +44,7 @@ public class NagaHooker {
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
     private ArrayList<Long> runAddr = new ArrayList<Long>();
     private boolean printW8 = false;
+    private KeystoneEncoded nop;
     public NagaHooker(String funcName, AndroidEmulator emulator, long base) {
         this.funcName = funcName;
         this.emulator = emulator;
@@ -45,6 +52,12 @@ public class NagaHooker {
         this.startBlock = 0L;
         this.currentBlock = 0L;
         this.lastUsedBlock = 0L;
+        try {
+            Keystone keystone = new Keystone(KeystoneArchitecture.Arm64, KeystoneMode.LittleEndian);
+            this.nop = keystone.assemble("nop");
+        } catch (Throwable e) {
+            System.out.println(e);
+        }
         resetTag("main");
     }
     public boolean isStop() {
@@ -61,7 +74,7 @@ public class NagaHooker {
         this.end = end;
         hookBlock(start, end);
         hookCode(start, end);
-        //hookCode(0, 0x76f48);
+//        hookCode(0, 0x76f48);
     }
     private void hookBlock(long start, long end) {
         this.emulator.getBackend().hook_add_new(new BlockHook() {
@@ -69,7 +82,6 @@ public class NagaHooker {
             @Override
             public void hookBlock(Backend backend, long address, int size, Object user) {
                 trackBlock(backend, address, size);
-                //logBlock(address, size);
             }
             @Override
             public void onAttach(UnHook unHook) {
@@ -131,15 +143,23 @@ public class NagaHooker {
         if (block.getType() != CodeBlockType.USED) {
             return;
         }
-        Long blkOffset = block.getOffset();
-        Instruction[] insns = emulator.disassemble(address, size,0);
+
+        Instruction[] insns = emulator.disassemble(address, size, 0);
         if (insns.length <= 0) {
             return;
         }
         Instruction ins = insns[0];
-        if (!ins.getMnemonic().equals("csel")) {
-            return;
+        String mnemonic = ins.getMnemonic();
+        if (mnemonic.equals("bl") || mnemonic.equals("blx")) {
+            //handleInsBl(offset, block, ins);
+        } else if (mnemonic.equals("csel")) {
+            handleInsCsel(offset, block, ins);
         }
+
+    }
+
+    private void handleInsCsel(long offset, CodeBlock block, Instruction ins) {
+        Long blkOffset = block.getOffset();
         capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
         if (opInfo == null) {
             throw new RuntimeException("Track Code [" + ins.toString() + "] get OpInfo fail!");
@@ -234,8 +254,19 @@ public class NagaHooker {
         } else {
             block.addRef();
         }
+
         blockList.add(mTag, offset);
         if (block.getType() == CodeBlockType.USED) {
+            List<Long> l = block.getBlList();
+            if (!l.isEmpty()) {
+                for (Long s : l) {
+                    long insOffset = s.longValue();
+                    System.out.println("patch offset " + Long.toHexString(insOffset) + " to nop");
+                    UnidbgPointer p = UnidbgPointer.pointer(emulator, insOffset);
+                    byte[] code = nop.getMachineCode();
+                    p.write(code);
+                }
+            }
             logBlock(address, size);
             if (lastUsedBlock != 0) {
                 CodeBlock lastBlock = blockMap.findBlock(lastUsedBlock);
