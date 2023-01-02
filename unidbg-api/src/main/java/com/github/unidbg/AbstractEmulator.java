@@ -203,7 +203,7 @@ public abstract class AbstractEmulator<T extends NewFileIO> implements Emulator<
 
     @Override
     public int getPid() {
-        return pid;
+        return 7167;//pid;
     }
 
     @Override
