@@ -65,13 +65,10 @@ public class NagaLoader {
         memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
         // libxloader.si total size : 0x2063FF
         //initRootfs();
-
-//        memory.disableCallInitFunction();
-        String funName = "init0";
-        NagaHooker blkHooker = new NagaHooker(funName, emulator, base);
-        blkHooker.hook(0x3CFB8, 0x3D450);
-//        UnidbgPointer p = memory.pointer(baseAddr + 0x90890);
         initDebuger();
+
+
+
         vm = emulator.createDalvikVM(); // 创建Android虚拟机
         vm.setVerbose(logging); // 设置是否打印Jni调用细节
         DalvikModule dm = vm.loadLibrary(new File(libPath), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
@@ -80,33 +77,33 @@ public class NagaLoader {
         List<String> tagList = new ArrayList<>();
         System.out.println("module base:" + Long.toHexString(module.base) + ",init func:" + funcs.size());
 
+        String funName = "init0";
+        NagaHooker blkHooker = new NagaHooker(funName, base, emulator, debugger);
+        blkHooker.hook(0x3CFB8, 0x3D450);
+
         NagaCodeLogger codeLogger = new NagaCodeLogger(emulator, funName, base);
         codeLogger.hook(0, 0x76f48);
         InitFunction func = funcs.get(0);
         blkHooker.resetTag("main");
         tagList.add("main");
-//        codeLogger.start();
+        //codeLogger.start();
         func.call(emulator);
-        codeLogger.stop();
+        //codeLogger.stop();
         blkHooker.save("main");
+
         int i = 0;
         for(i = 0; i < 10 && !blkHooker.isStop(); i++) {
             String tag = "Tag" + i;
             tagList.add(tag);
-//            if (i == 2) {
-//                codeLogger.start();
-//            } else {
-//                codeLogger.stop();
-//            }
             System.out.println("call func with tag: " + tag + " >>>>>>");
             blkHooker.resetTag(tag);
             func.call(emulator);
             blkHooker.save(tag);
         }
         blkHooker.saveCallStack();
-
 //        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-        System.out.println(">>>>>>> i:"+i);
+
+        System.out.println(">>>>>>> i:"+ i);
     }
     private void destroy() {
         try {
@@ -132,7 +129,7 @@ public class NagaLoader {
         long base = 0x40000000;
 //        debugger = emulator.attach();
         debugger = emulator.attach(dbgType);
-        debugger.addBreakPoint(base + 0x3745c);
+        //debugger.addBreakPoint(base + 0x3d19c);
 //        debugger.addBreakPoint(base + 0x30DFC);
     }
     private void initRootfs() {

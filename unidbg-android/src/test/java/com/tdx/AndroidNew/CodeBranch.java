@@ -8,7 +8,27 @@ import java.util.Optional;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
+/*
+*
+0000 = EQ - Z set (equal，相等)
+0001 = NE - Z clear (not equal，不相等)
+0010 = CS - C set (unsigned higher or same，无符号大于或等于)
+0011 = CC - C clear (unsigned lower，无符号小于)
+0100 = MI - N set (negative，负数)
+0101 = PL - N clear (positive or zero，正数或零)
+0110 = VS - V set (overflow，溢出)
+0111 = VC - V clear (no overflow，未溢出)
+1000 = HI - C set and Z clear (unsigned higher，无符号大于)
+1001 = LS - C clear or Z set (unsigned lower or same，无符号小于或等于)
+1010 = GE - N set and V set, or N clear and V clear (greater or equal，带符号大于或等于)
+1011 = LT - N set and V clear, or N clear and V set (less than，带符号小于)
+1100 = GT - Z clear, and either N set and V set, or N clear and V clear (greater than，带符号大于)
+1101 = LE - Z set, or N set and V clear, or N clear and V set (less than or equal，带符号小于或等于)
+1110 = AL - always
+1111 = NV - never
 
+*
+* */
 public class CodeBranch {
 
     public static int N_BIT = 31;
@@ -23,6 +43,8 @@ public class CodeBranch {
     private static int getBit(int nzcv, int pos) {
         return (nzcv >> pos) & 0x00000001;
     }
+    private static int setBit(int nzcv, int pos) { return (1 << pos) | nzcv ;}
+    private static int clearBit(int nzcv, int pos) { return (~(1 << pos)) & nzcv;}
     private long blkOffset;
     private long insOffset;
     private int cc;
@@ -148,6 +170,127 @@ public class CodeBranch {
                 return "NV";
         }
         return "UNKNOW";
+    }
+    static public int getNZCV(int cc, int nzcv, boolean result) {
+        switch (cc) {
+            case Arm64_const.ARM64_CC_EQ:
+                if (result) {nzcv = setBit(nzcv, Z_BIT);
+                } else { nzcv = clearBit(nzcv, Z_BIT);}
+                break;
+            case Arm64_const.ARM64_CC_NE:
+                if (result) { nzcv = clearBit(nzcv, Z_BIT);
+                } else { nzcv = setBit(nzcv, Z_BIT); }
+                break;
+            case Arm64_const.ARM64_CC_HS:
+                if (result) { nzcv = setBit(nzcv, C_BIT);
+                } else { nzcv = clearBit(nzcv, C_BIT); }
+                break;
+            case Arm64_const.ARM64_CC_LO:
+                if (result) { nzcv = clearBit(nzcv, C_BIT);
+                } else { nzcv = setBit(nzcv, C_BIT); }
+                break;
+            case Arm64_const.ARM64_CC_MI:
+                if (result) {  nzcv = setBit(nzcv, N_BIT);
+                } else { nzcv = clearBit(nzcv, N_BIT);}
+                break;
+            case Arm64_const.ARM64_CC_PL:
+                if (result) { nzcv = clearBit(nzcv, N_BIT);
+                } else { nzcv = setBit(nzcv, N_BIT); }
+                break;
+            case Arm64_const.ARM64_CC_VS:
+                if (result) { nzcv = setBit(nzcv, V_BIT);
+                } else {nzcv = clearBit(nzcv, V_BIT);}
+                break;
+            case Arm64_const.ARM64_CC_VC:
+                if (result) { nzcv = clearBit(nzcv, V_BIT);
+                } else { nzcv = setBit(nzcv, V_BIT); }
+                break;
+            case Arm64_const.ARM64_CC_HI:
+                if (result) {
+                    nzcv = setBit(nzcv, C_BIT);
+                    nzcv = clearBit(nzcv, Z_BIT);
+                } else {
+                    nzcv = clearBit(nzcv, C_BIT);
+                    nzcv = setBit(nzcv, Z_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_LS:
+                if (result) {
+                    nzcv = clearBit(nzcv, C_BIT);
+                    nzcv = setBit(nzcv, Z_BIT);
+                } else {
+                    nzcv = setBit(nzcv, C_BIT);
+                    nzcv = clearBit(nzcv, Z_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_GE:
+                if (result) {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                } else {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_LT:
+                if (result) {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                } else {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_GT:
+                if (result) {
+                    nzcv = clearBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                } else {
+                    nzcv = setBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_LE:
+                if (result) {
+                    nzcv = setBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                } else {
+                    nzcv = clearBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_AL:
+                if (result) {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, C_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                } else {
+                    nzcv = clearBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, Z_BIT);
+                    nzcv = clearBit(nzcv, C_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                }
+                break;
+            case Arm64_const.ARM64_CC_NV:
+                if (!result) {
+                    nzcv = setBit(nzcv, N_BIT);
+                    nzcv = setBit(nzcv, Z_BIT);
+                    nzcv = setBit(nzcv, C_BIT);
+                    nzcv = setBit(nzcv, V_BIT);
+                } else {
+                    nzcv = clearBit(nzcv, N_BIT);
+                    nzcv = clearBit(nzcv, Z_BIT);
+                    nzcv = clearBit(nzcv, C_BIT);
+                    nzcv = clearBit(nzcv, V_BIT);
+                }
+                break;
+        }
+        return  nzcv;
     }
     static public boolean checkBranch(int cc, int nzcv) {
         switch (cc) {

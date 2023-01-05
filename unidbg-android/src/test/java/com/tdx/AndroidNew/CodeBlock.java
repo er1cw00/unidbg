@@ -67,6 +67,9 @@ public class CodeBlock {
         return ins.getAddress() - this.base;
     }
     public CodeBlockType checkType() {
+        if (this.type != CodeBlockType.UNKNOWN) {
+            return this.type;
+        }
         int len = instruction.size();
         ArrayList<String> jmpCmds = new ArrayList(Arrays.asList("b.eq","b.ne","b.le","b.gt"));
         Instruction last = instruction.get(len - 1);
@@ -87,13 +90,6 @@ public class CodeBlock {
                 }
             }
         }
-//        for (int i = 0; i < len; i++) {
-//            Instruction ins = instruction.get(i);
-//            short[] regs = writeRegs(ins);
-//            for (int j = 0; j < regs.length; j++) {
-//            }
-//            //System.out.printf("write:[" + w + "], read:["+ r + "], Instruction:" + ins + "\n");
-//        }
         return CodeBlockType.USED;
     }
     public int branchSize() {

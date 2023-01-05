@@ -42,4 +42,41 @@ public class CodeBlockList {
     public Integer getCC(Long off) {
         return branch.get(off);
     }
+    boolean checkInLoop(String tag) {
+        ArrayList<Long> list = mListMap.get(tag);
+        int len = list.size();
+        if (len <= 2) {
+            return false;
+        }
+        int last = len - 1;
+        Long lastOffset = list.get(last);
+        int found1 = -1;
+        int found2 = -1;
+        for (int i = last - 1; i >= 0; i--) {
+            if (list.get(i).equals(lastOffset)) {
+                if (found1 == -1) {
+                    found1 = i;
+                } else if (found2 == -1) {
+                    found2 = i;
+                    break;
+                }
+            }
+        }
+        if (found1 != -1 && found2 != -1) {
+            int gap = last - found1;
+            if (gap != found1 - found2) {
+                return false;
+            }
+            for (int i = found2; i < found1; i++) {
+                Long off1 = list.get(i);
+                Long off2 = list.get(i+gap);
+                if (!off1.equals(off2)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
 }
+

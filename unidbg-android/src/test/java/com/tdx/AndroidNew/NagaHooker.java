@@ -21,11 +21,13 @@ import java.util.Set;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
+import jdk.nashorn.internal.runtime.Debug;
 import keystone.Keystone;
 import keystone.KeystoneArchitecture;
 import keystone.KeystoneEncoded;
 import keystone.KeystoneMode;
 import unicorn.Arm64Const;
+import com.github.unidbg.debugger.Debugger;
 
 public class NagaHooker {
 
@@ -39,16 +41,19 @@ public class NagaHooker {
     private Long currentBlock;
     private Long startBlock;
     private Long lastUsedBlock;
+    private Debugger debugger;
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
-    private ArrayList<Long> runAddr = new ArrayList<Long>();
+    private ArrayList<Long> patchList = new ArrayList<Long>();
+
     private boolean printW8 = false;
     private KeystoneEncoded nop;
-    public NagaHooker(String funcName, AndroidEmulator emulator, long base) {
+    public NagaHooker(String funcName, long base, AndroidEmulator emulator, Debugger debugger) {
         this.funcName = funcName;
         this.emulator = emulator;
         this.base = base;
+        this.debugger = debugger;
         this.startBlock = 0L;
         this.currentBlock = 0L;
         this.lastUsedBlock = 0L;
@@ -74,7 +79,25 @@ public class NagaHooker {
         this.end = end;
         hookBlock(start, end);
         hookCode(start, end);
-//        hookCode(0, 0x76f48);
+        patchJump(start, end);
+    }
+    public void patchJump(long start, long end) {
+        int size = (int)(end - start);
+        patchList.clear();
+        Instruction[] insns = emulator.disassemble(start + base, size,0);
+        int len = insns.length;
+        for (int i = 0; i < len; i++) {
+            Instruction ins = insns[i];
+            String mnemonic = ins.getMnemonic();
+            if (mnemonic.equals("bl") || mnemonic.equals("blx")) {
+                long addr = ins.getAddress();
+                patchList.add(addr - base);
+                System.out.println("patch offset " + Long.toHexString(addr) + " to nop");
+                UnidbgPointer p = UnidbgPointer.pointer(emulator, addr);
+                byte[] code = nop.getMachineCode();
+                p.write(code);
+            }
+        }
     }
     private void hookBlock(long start, long end) {
         this.emulator.getBackend().hook_add_new(new BlockHook() {
@@ -108,7 +131,7 @@ public class NagaHooker {
             public void hook(Backend backend, long address, int size, Object user) {
                 if (printW8) {
                     int w8 = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_W8).intValue();
-                    //log.info("W8 reg:" + Integer.toHexString(w8));
+                    log.info("W8 reg:" + Integer.toHexString(w8));
                     printW8 = false;
                 }
                 trackCode(backend, address, size);
@@ -203,6 +226,10 @@ public class NagaHooker {
             branch = new CodeBranch(offset, blkOffset, cc, ins);
             branch.set(0, ccResult);
             branch.setLast(ccResult);
+            log.info("result: " + ccResult + "," + CodeBranch.nzcvLabel(nzcv) +
+                     ", w8:"+Long.toHexString(w8) +
+                     ",reg2:" + Long.toHexString(wx) +
+                     ",reg3:"+ Long.toHexString(wy));
             log.info("new branch :" + branch);
             branchTracker.add(branch);
             branchTracker.push(branch);
@@ -217,10 +244,21 @@ public class NagaHooker {
                         branch.set(1, CodeBlock.CC_TRUE);
                         branch.setLast(CodeBlock.CC_TRUE);
                     }
-                    emulator.getBackend().reg_write(reg2, wy);
-                    emulator.getBackend().reg_write(reg3, wx);
+                    long a = 0x3d040L;
+                    if (blkOffset.equals(a)) {
+                        System.out.println("sss");
+                    }
+                    int newNZCV = CodeBranch.getNZCV(cc, nzcv, b != CodeBlock.CC_TRUE);
+                    emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_NZCV, newNZCV);
                     branchTracker.pop();
+                    log.info("result: " + ccResult +
+                             "," + CodeBranch.nzcvLabel(nzcv) +
+                             "," + CodeBranch.nzcvLabel(newNZCV) +
+                             ", w8:"+Long.toHexString(w8) +
+                             ",reg2:" + Long.toHexString(wx) +
+                             ",reg3:"+ Long.toHexString(wy));
                     log.info("find last branch need change:" + branch);
+                   // debugger.addBreakPoint(base + 0x3d19c);
                 }
             } else {
                 int s = branch.size();
@@ -250,27 +288,26 @@ public class NagaHooker {
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
             block = new CodeBlock(start, this.base, offset, insns);
+            if (checkBlockPatched(block)) {
+                block.setType(CodeBlockType.USED);
+            }
             blockMap.addBlock(block);
         } else {
             block.addRef();
         }
-
+        logBlock(address, size);
         blockList.add(mTag, offset);
         if (block.getType() == CodeBlockType.USED) {
-            List<Long> l = block.getBlList();
-            if (!l.isEmpty()) {
-                for (Long s : l) {
-                    long insOffset = s.longValue();
-                    System.out.println("patch offset " + Long.toHexString(insOffset) + " to nop");
-                    UnidbgPointer p = UnidbgPointer.pointer(emulator, insOffset);
-                    byte[] code = nop.getMachineCode();
-                    p.write(code);
-                }
-            }
-            logBlock(address, size);
+//            logBlock(address, size);
             if (lastUsedBlock != 0) {
+                //Long a = 0x3d31cL;
+
                 CodeBlock lastBlock = blockMap.findBlock(lastUsedBlock);
                 CodeBranch lastBranch = branchTracker.getByOffset(lastUsedBlock);
+//                if (a.equals(lastUsedBlock)) {
+//                    System.out.println("lastUsedBlock:"+ lastBlock+ ",current: "+ block);
+//                }
+
                 if (lastBlock != null) {
                     int type = CodeBlock.CC_NONE;
                     if (lastBranch != null) {
@@ -285,6 +322,20 @@ public class NagaHooker {
             }
             lastUsedBlock = block.getOffset();
         }
+        if (blockList.checkInLoop(mTag)) {
+            backend.emu_stop();
+        }
+    }
+    private boolean checkBlockPatched(CodeBlock block) {
+        long start = block.getStart();
+        long end = block.getEnd();
+        for (Long patchd : patchList) {
+            long off = patchd.longValue();
+            if (start <= off && off <= end) {
+                return true;
+            }
+        }
+        return false;
     }
     private void logBlock(long address, int size) {
         long offset = address - base;
@@ -301,25 +352,8 @@ public class NagaHooker {
 //                                            ",addr:" + Long.toHexString(ins.getAddress()) +
 //                                            "]");
     }
-    public void saveRunAddress() {
-        String rootDir = emulator.getFileSystem().getRootDir().toString();
-        File file = new File(rootDir+"/log/"+funcName+"/offset.txt");
-        try {
-            file.createNewFile();
-            FileWriter writer =new FileWriter(file.getAbsoluteFile());
-            BufferedWriter bufferedWriter = new BufferedWriter(writer);
-            for(Long offset : runAddr) {
-                bufferedWriter.write("0x"+Long.toHexString(offset)+"\r\n");
-            }
-            bufferedWriter.close();
-            writer.close();
-        } catch (Exception e) {
-            System.out.printf("exception:\n" + e);
-        }
-        System.out.println("write run offset to " + file.getAbsoluteFile());
-    }
-    public void saveCallStack() {
 
+    public void saveCallStack() {
         String rootDir = emulator.getFileSystem().getRootDir().toString();
         File file = new File(rootDir + File.separator + "log" + File.separator +funcName+"_blocks.txt");
         try {
@@ -335,6 +369,7 @@ public class NagaHooker {
                 if (block.getType() == CodeBlockType.FAKE) {
                     continue;
                 }
+
                 bufferedWriter.write(block.toString());
                 if (i + 1 < s) {
                     bufferedWriter.write(",\n");
