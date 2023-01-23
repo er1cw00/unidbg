@@ -48,7 +48,11 @@ public class CodeBranchTracker {
     public void pop() {
         int last = stack.size() - 1;
         if (last >= 0) {
+            Long lastOffset = stack.get(last);
+            System.out.println("pop branch: "+ Long.toHexString(lastOffset)+ ", last index:"+last);
             stack.remove(last);
+        } else {
+            System.out.println("pop not");
         }
     }
     public int findRing(long blkOffset) {

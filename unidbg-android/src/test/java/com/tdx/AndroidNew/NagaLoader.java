@@ -42,15 +42,37 @@ public class NagaLoader {
     private final String libPath = "/Users/wadahana/Desktop/tdx/libxloader.so";
 //    private final String libPath = "/Users/wadahana/Desktop/tdx/xloader/xloader.so";
 
+    class Function {
+        public String name;
+        public long start;
+        public long end;
+        public Function(String name, long start, long end) {
+            this.name = name;
+            this.start = start;
+            this.end = end;
+        }
+    };
+    private List<Function> funcList = new ArrayList<>();
     public static void main(String[] args) {
         initLogger();
         NagaLoader loader = new NagaLoader(true);
-
 //        loader.load();
 //        loader.destroy();
     }
 
-
+    public void initFuncList() {
+        funcList.add(new Function("sub_4aef4", 0x4aef4L, 0x4b20cL));
+        funcList.add(new Function("sub_4a8b4", 0x4a8b4L, 0x4aef0L));
+        funcList.add(new Function("sub_4c398", 0x4c398L, 0x4cdf0L));
+        funcList.add(new Function("sub_4319c", 0x4319cL, 0x43a9cL));
+        funcList.add(new Function("sub_52764", 0x52764L, 0x5297CL));
+        funcList.add(new Function("sub_5419c", 0x5419cL, 0x542DCL));
+        funcList.add(new Function("sub_5C3fC", 0x5C3fCL, 0x5C6A4L));
+        funcList.add(new Function("sub_5C6A8", 0x5C6A8L, 0x5C910L));
+        funcList.add(new Function("sub_37588", 0x37588L, 0x37784L));
+        funcList.add(new Function("sub_37788", 0x37788L, 0x379c4L));
+        funcList.add(new Function("init_proc", 0x3CFB8L, 0x3D450L));
+    }
     NagaLoader(boolean logging) {
         this.logging = logging;
         emulator = AndroidEmulatorBuilder.for64Bit()
@@ -66,7 +88,7 @@ public class NagaLoader {
         // libxloader.si total size : 0x2063FF
         //initRootfs();
         initDebuger();
-
+        initFuncList();
 
 
         vm = emulator.createDalvikVM(); // 创建Android虚拟机
@@ -77,32 +99,38 @@ public class NagaLoader {
         List<String> tagList = new ArrayList<>();
         System.out.println("module base:" + Long.toHexString(module.base) + ",init func:" + funcs.size());
 
-        String funName = "init0";
+        Function func = funcList.get(0);
+        String funName = func.name;
+        long funStart = func.start;
+        long funEnd = func.end;
+
         NagaHooker blkHooker = new NagaHooker(funName, base, emulator, debugger);
-        blkHooker.hook(0x3CFB8, 0x3D450);
+        //blkHooker.hook(0x3CFB8, 0x3D450);
+        blkHooker.hook(funStart, funEnd);
 
         NagaCodeLogger codeLogger = new NagaCodeLogger(emulator, funName, base);
         codeLogger.hook(0, 0x76f48);
-        InitFunction func = funcs.get(0);
+//        InitFunction func = funcs.get(0);
         blkHooker.resetTag("main");
         tagList.add("main");
-        //codeLogger.start();
-        func.call(emulator);
+//        codeLogger.start();
+        module.callFunction(emulator, funStart);
+        //func.call(emulator);
         //codeLogger.stop();
         blkHooker.save("main");
-
         int i = 0;
         for(i = 0; i < 10 && !blkHooker.isStop(); i++) {
             String tag = "Tag" + i;
+//            if (i == 1) {codeLogger.start();}
             tagList.add(tag);
             System.out.println("call func with tag: " + tag + " >>>>>>");
             blkHooker.resetTag(tag);
-            func.call(emulator);
+            module.callFunction(emulator, funStart);
+            codeLogger.stop();
+            //func.call(emulator);
             blkHooker.save(tag);
         }
         blkHooker.saveCallStack();
-//        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-
         System.out.println(">>>>>>> i:"+ i);
     }
     private void destroy() {
