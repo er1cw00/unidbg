@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import capstone.Arm64_const;
 import capstone.api.Instruction;
@@ -24,6 +25,7 @@ public class CodeBlock {
     private CodeBlockType type;
     private List<Instruction> instruction;
     private Map<Integer, Long> branch;
+    private Map<Long, Instruction> patchMap;
 
     public CodeBlock(boolean start, long base, long offset, Instruction[] insns) {
         this.ref = 0;
@@ -33,6 +35,7 @@ public class CodeBlock {
         this.branch = new HashMap<>();
         this.start = start;
         this.type = CodeBlockType.UNKNOWN;
+        this.patchMap = new HashMap<Long, Instruction>();
     }
     public void addRef() {
         ref += 1;
@@ -66,12 +69,33 @@ public class CodeBlock {
         Instruction ins = this.instruction.get(len - 1);
         return ins.getAddress() - this.base;
     }
-    public CodeBlockType checkType() {
-        if (this.type != CodeBlockType.UNKNOWN) {
-            return this.type;
+    private boolean checkBlockPatched(Map<Long, Instruction> patchMap) {
+        long start = getStart();
+        long end = getEnd();
+        boolean found = false;
+        Set<Long> keys = patchMap.keySet();
+        for (Long key : keys) {
+            long offset = key.longValue();
+            if (start <= offset && offset <= end) {
+                found = true;
+                this.patchMap.put(offset, patchMap.get(offset));
+            }
+        }
+        return found;
+    }
+    public CodeBlockType checkType(Map<Long, Instruction> patchMap) {
+        if (checkBlockPatched(patchMap)) {
+            return CodeBlockType.USED;
+        }
+        if (offset == 0x436d8L) {
+            System.out.println("asdf");
         }
         int len = instruction.size();
-        ArrayList<String> jmpCmds = new ArrayList(Arrays.asList("b.eq","b.ne","b.le","b.gt"));
+        ArrayList<String> jmpOps = new ArrayList(Arrays.asList("b.eq","b.ne","b.le","b.gt","b.lt","b.ge"));
+        ArrayList<String> usedOps = new ArrayList(Arrays.asList("adr","adrp",
+                                                                "ldr","ldrh","ldrb","ldur","ldurh","ldurb",
+                                                                "str","strb","strh","stur","sturb","sturh",
+                                                                "ldp","stp"));
         Instruction last = instruction.get(len - 1);
         if (len == 1 && last.getMnemonic().equals("b")) {
             return CodeBlockType.USED;
@@ -163,7 +187,11 @@ public class CodeBlock {
             sb.append("\t\"ins\": [\n");
             for (int i = 0; i < length; i++) {
                 Instruction ins = this.instruction.get(i);
-                sb.append("\t\t\"0x" + Long.toHexString(ins.getAddress() - base) +
+                long off = ins.getAddress() - base;
+                if (patchMap.containsKey(off)) {
+                    ins = patchMap.get(off);
+                }
+                sb.append("\t\t\"0x" + Long.toHexString(off) +
                         "   " + bytesToString(ins.getBytes()) +
                         "   " + ins.toString() + "\"");
                 if (i + 1 < length) {
