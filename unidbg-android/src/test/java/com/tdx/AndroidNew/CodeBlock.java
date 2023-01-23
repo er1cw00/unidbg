@@ -163,25 +163,6 @@ public class CodeBlock {
             }
             sb.append("\t],\n");
         }
-//        if (branch != null) {
-//            sb.append("\t\"branch\": {\n").append(", \n");
-//            sb.append("\t\t\"offset\": \"").append(Long.toHexString(branch.getInsOffset())).append("\", \n");
-//            sb.append("\t\t\"cc\": \"").append(CodeBranch.ccLabel(branch.getCC())).append("\", \n");
-//
-//            int length = branch.size();
-//            if (length > 0) {
-//                sb.append("\t\t\"list\": [");
-//                for (int i = 0; i < length; i++) {
-//                    int b = branch.get(i);
-//                    sb.append(b);
-//                    if (i + 1 < length) {
-//                        sb.append(",");
-//                    }
-//                }
-//                sb.append("]\n");
-//            }
-//            sb.append("\t}");
-//        }
         int length = this.instruction.size();
         if (length > 0) {
             sb.append("\t\"ins\": [\n");
