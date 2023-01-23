@@ -16,7 +16,11 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import capstone.Arm64_const;
@@ -27,6 +31,8 @@ import keystone.KeystoneArchitecture;
 import keystone.KeystoneEncoded;
 import keystone.KeystoneMode;
 import unicorn.Arm64Const;
+import unicorn.UnicornConst;
+
 import com.github.unidbg.debugger.Debugger;
 
 public class NagaHooker {
@@ -41,15 +47,16 @@ public class NagaHooker {
     private Long currentBlock;
     private Long startBlock;
     private Long lastUsedBlock;
+    private Long lastUsedBlock0;
     private Debugger debugger;
     private CodeBlockList blockList = new CodeBlockList();
     private CodeBlockMap blockMap = new CodeBlockMap();
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
     private ArrayList<Long> patchList = new ArrayList<Long>();
-
     private Map<Long, Instruction> patchMap = new HashMap<Long, Instruction>();
     private boolean printW8 = false;
     private KeystoneEncoded nop;
+    private UnidbgPointer ptrDummy = null;
     public NagaHooker(String funcName, long base, AndroidEmulator emulator, Debugger debugger) {
         this.funcName = funcName;
         this.emulator = emulator;
@@ -58,6 +65,7 @@ public class NagaHooker {
         this.startBlock = 0L;
         this.currentBlock = 0L;
         this.lastUsedBlock = 0L;
+        this.lastUsedBlock0 = 0L;
         try {
             Keystone keystone = new Keystone(KeystoneArchitecture.Arm64, KeystoneMode.LittleEndian);
             this.nop = keystone.assemble("nop");
@@ -73,6 +81,7 @@ public class NagaHooker {
         mTag = tag;
         this.blockList.resetList(tag);
         this.lastUsedBlock = 0L;
+        this.lastUsedBlock0 = 0L;
         log.warn("branchTracker.size:"+ branchTracker.size());
     }
     public void hook(long start, long end) {
@@ -84,7 +93,6 @@ public class NagaHooker {
     }
     public void patchJump(long start, long end) {
         int size = (int)(end - start);
-        patchList.clear();
 //        patchList.clear();
         patchMap.clear();
         Instruction[] insns = emulator.disassemble(start + base, size,0);
@@ -135,7 +143,7 @@ public class NagaHooker {
             @Override
             public void hook(Backend backend, long address, int size, Object user) {
                 if (printW8) {
-                    int w8 = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_W8).intValue();
+                    int w8 = emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_W9).intValue();
                     log.info("W8 reg:" + Integer.toHexString(w8));
                     printW8 = false;
                 }
@@ -161,7 +169,27 @@ public class NagaHooker {
     }
     private void trackCode(Backend backend, long address, int size) {
         long offset = address - base;
-
+        int regId = -1;
+        if (offset == 0x4b0f0) {
+            regId = Arm64Const.UC_ARM64_REG_X0;
+        } else if (offset == 0x4a9a0) {
+            regId = Arm64Const.UC_ARM64_REG_X1;
+        } else if (offset == 0x439e4 || offset == 0x436b8 ||
+                offset == 0x4c8a0 || offset == 0x4c8b0 || offset == 0x4cb24 || offset == 0x4cc1c ||
+                offset == 0x4ad1c) {
+            regId = Arm64Const.UC_ARM64_REG_X8;
+        } else if (offset == 0x4c888 || offset == 0x4c860) {
+            regId = Arm64Const.UC_ARM64_REG_X10;
+        } else if (offset == 0x4cd68 || offset == 0x4ccc0 || offset == 0x4cd0c) {
+            regId = Arm64Const.UC_ARM64_REG_X12;
+        } else if (offset == 0x4a938 || offset== 0x4a998) {
+            regId = Arm64Const.UC_ARM64_REG_X15;
+        } else if (offset == 0x4b188) {
+            regId = Arm64Const.UC_ARM64_REG_X27;
+        }
+        if (regId != -1) {
+            patchMemoryDummy(regId, offset);
+        }
         CodeBlock block = blockMap.findBlock(currentBlock);
         if (block == null) {
             log.warn("can not find current blk: " + Long.toHexString(currentBlock));
@@ -178,14 +206,38 @@ public class NagaHooker {
         }
         Instruction ins = insns[0];
         String mnemonic = ins.getMnemonic();
-        if (mnemonic.equals("bl") || mnemonic.equals("blx")) {
-            //handleInsBl(offset, block, ins);
-        } else if (mnemonic.equals("csel")) {
+        final List<String> bList = new ArrayList(Arrays.asList("b.eq", "b.ne",
+                                                            "b.cc", "b.cs",
+                                                            "b.lo", "b.hs",
+                                                            "b.hi", "b.ls",
+                                                            "b.vc", "b.vs",
+                                                            "b.mi", "b.pl",
+                                                            "b.le", "b.gt",
+                                                            "b.lt", "b.ge" ));
+        final List<String> bzList = new ArrayList(Arrays.asList("tbz", "tbnz",
+                                                                "cbz", "cbnz"));
+
+        if (mnemonic.equals("csel")) {
             handleInsCsel(offset, block, ins);
+        } else if (bList.contains(mnemonic)) {
+            log.warn("xfind b.cc jmp:" + Long.toHexString(offset) +
+                     ", block: "+ Long.toHexString(block.getOffset()) +
+                     ", ins: " + mnemonic + " " + ins.getOpStr());
+        } else if (bzList.contains(mnemonic)) {
+            log.warn("xfind bz jmp:" + Long.toHexString(offset) +
+                    ", block: "+ Long.toHexString(block.getOffset()) +
+                    ", ins: " + mnemonic + " " + ins.getOpStr());
         }
-
     }
-
+    private void patchMemoryDummy(int regId, long offset) {
+        if (ptrDummy == null) {
+            ptrDummy = emulator.getMemory().mmap(1024, UnicornConst.UC_PROT_ALL);
+            ptrDummy.setLong(0x0, ptrDummy.peer);
+        }
+        long p = ptrDummy.peer;
+        log.info("patch 0x" + Long.toHexString(offset) + " to 0x" + Long.toHexString(p));
+        emulator.getBackend().reg_write(regId, p);
+    }
     private void handleInsCsel(long offset, CodeBlock block, Instruction ins) {
         Long blkOffset = block.getOffset();
         capstone.api.arm64.OpInfo opInfo = (capstone.api.arm64.OpInfo) ins.getOperands();
@@ -249,10 +301,7 @@ public class NagaHooker {
                         branch.set(1, CodeBlock.CC_TRUE);
                         branch.setLast(CodeBlock.CC_TRUE);
                     }
-                    long a = 0x3d040L;
-                    if (blkOffset.equals(a)) {
-                        System.out.println("sss");
-                    }
+
                     int newNZCV = CodeBranch.getNZCV(cc, nzcv, b != CodeBlock.CC_TRUE);
                     emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_NZCV, newNZCV);
                     branchTracker.pop();
@@ -268,14 +317,30 @@ public class NagaHooker {
             } else {
                 int s = branch.size();
                 if (s == 2) { // find ring, break;
-                    log.warn("find Ring BlkOffset:" + Long.toHexString(blkOffset) + "; " +
+                    log.warn("run as last, " +
                             "branch: " + branch);
-
+                    int b = branch.get(1);
+                    if (b != ccResult) {
+                        log.info("setLast:"+b+",blk:"+Long.toHexString(blkOffset));
+                        branch.setLast(b);
+                        int newNZCV = CodeBranch.getNZCV(cc, nzcv, b == CodeBlock.CC_TRUE);
+                        emulator.getBackend().reg_write(Arm64Const.UC_ARM64_REG_NZCV, newNZCV);
+                        log.info("result: " + ccResult +
+                                "," + CodeBranch.nzcvLabel(nzcv) +
+                                "," + CodeBranch.nzcvLabel(newNZCV) +
+                                ",w8:"+Long.toHexString(w8) +
+                                ",reg2:" + Long.toHexString(wx) +
+                                ",reg3:"+ Long.toHexString(wy));
+                    } else {
+                        log.info("last branch:" + b +
+                                  ", result:" + ccResult +
+                                  ", nzcv" + CodeBranch.nzcvLabel(nzcv));
+                    }
                 } else if (s == 1) {
                     // 按照之前的分支运行
                     log.info("find branch run as previous:" + branch);
+                    branch.setLast(ccResult);
                 }
-                branch.setLast(ccResult);
             }
         }
         printW8 = true;
@@ -303,19 +368,13 @@ public class NagaHooker {
         } else {
             block.addRef();
         }
-        logBlock(address, size);
+//        logBlock(address, size);
         blockList.add(mTag, offset);
         if (block.getType() == CodeBlockType.USED) {
 //            logBlock(address, size);
             if (lastUsedBlock != 0) {
-                //Long a = 0x3d31cL;
-
                 CodeBlock lastBlock = blockMap.findBlock(lastUsedBlock);
                 CodeBranch lastBranch = branchTracker.getByOffset(lastUsedBlock);
-//                if (a.equals(lastUsedBlock)) {
-//                    System.out.println("lastUsedBlock:"+ lastBlock+ ",current: "+ block);
-//                }
-
                 if (lastBlock != null) {
                     int type = CodeBlock.CC_NONE;
                     if (lastBranch != null) {
@@ -324,10 +383,19 @@ public class NagaHooker {
                     try {
                         lastBlock.putBranch(type, offset);
                     } catch (Exception e) {
-                        log.error("exception when put branch: " + e);
+
+                        log.error("exception when put branch: " + e +
+                                   ",lastUsed: " + Long.toHexString(lastUsedBlock0) +
+                                   ",branch: " + type);
+                    }
+                    if (lastUsedBlock == 0x4c4c0L) {
+                        log.info("xxxxxx: " + Long.toHexString(lastUsedBlock0) +
+                                 " -> " + Long.toHexString(lastUsedBlock) +
+                                 " -> " + Long.toHexString(offset));
                     }
                 }
             }
+            lastUsedBlock0 = lastUsedBlock;
             lastUsedBlock = block.getOffset();
         }
         if (blockList.checkInLoop(mTag)) {
@@ -341,14 +409,6 @@ public class NagaHooker {
         System.out.println("block hook => pc:" + Long.toHexString(pc) +
                             ",offset:" + String.format("0x%x", offset) +
                             ",size:" + size);
-
-//      for(Instruction ins :insns) {
-//           System.out.println("code hook => offset:" + String.format("0x%x", offset) +
-//                                            ",code: " + ins.toString() + " [" +
-//                                            ",Mnemonic:" + ins.getMnemonic() +
-//                                            ",ops:" + ins.getOpStr() +
-//                                            ",addr:" + Long.toHexString(ins.getAddress()) +
-//                                            "]");
     }
 
     public void saveCallStack() {
