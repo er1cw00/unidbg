@@ -47,6 +47,7 @@ public class NagaHooker {
     private CodeBranchTracker branchTracker = new CodeBranchTracker();
     private ArrayList<Long> patchList = new ArrayList<Long>();
 
+    private Map<Long, Instruction> patchMap = new HashMap<Long, Instruction>();
     private boolean printW8 = false;
     private KeystoneEncoded nop;
     public NagaHooker(String funcName, long base, AndroidEmulator emulator, Debugger debugger) {
@@ -84,14 +85,18 @@ public class NagaHooker {
     public void patchJump(long start, long end) {
         int size = (int)(end - start);
         patchList.clear();
+//        patchList.clear();
+        patchMap.clear();
         Instruction[] insns = emulator.disassemble(start + base, size,0);
         int len = insns.length;
         for (int i = 0; i < len; i++) {
             Instruction ins = insns[i];
             String mnemonic = ins.getMnemonic();
-            if (mnemonic.equals("bl") || mnemonic.equals("blx")) {
+            if (mnemonic.equals("bl") || mnemonic.equals("blx") || mnemonic.equals("blr") ) {
                 long addr = ins.getAddress();
-                patchList.add(addr - base);
+                Long offset = addr - base;
+                patchMap.put(offset, ins);
+                //patchList.add(offset);
                 System.out.println("patch offset " + Long.toHexString(addr) + " to nop");
                 UnidbgPointer p = UnidbgPointer.pointer(emulator, addr);
                 byte[] code = nop.getMachineCode();
@@ -288,9 +293,12 @@ public class NagaHooker {
         if (block == null) {
             Instruction[] insns = emulator.disassemble(address, size,0);
             block = new CodeBlock(start, this.base, offset, insns);
-            if (checkBlockPatched(block)) {
-                block.setType(CodeBlockType.USED);
+
+            block.setType(block.checkType(patchMap));
+            if (offset==0x4c4c0L || offset == 0x4abfcL || offset == 0x4ac04L || offset == 0x4ac00L) {
+                block.setType(CodeBlockType.FAKE);
             }
+
             blockMap.addBlock(block);
         } else {
             block.addRef();
@@ -326,17 +334,7 @@ public class NagaHooker {
             backend.emu_stop();
         }
     }
-    private boolean checkBlockPatched(CodeBlock block) {
-        long start = block.getStart();
-        long end = block.getEnd();
-        for (Long patchd : patchList) {
-            long off = patchd.longValue();
-            if (start <= off && off <= end) {
-                return true;
-            }
-        }
-        return false;
-    }
+
     private void logBlock(long address, int size) {
         long offset = address - base;
         long pc = this.emulator.getBackend().reg_read(Arm64Const.UC_ARM64_REG_PC).longValue();
