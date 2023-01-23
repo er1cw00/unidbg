@@ -56,7 +56,7 @@ public class CodeBlockMap {
             throw new RuntimeException("block [" + offset + "] exist in list");
         }
         blockList.add(idx+1, offset);
-        block.setType(block.checkType());
+//        block.setType(block.checkType());
         block.addRef();
         blockMap.put(offset, block);
     }

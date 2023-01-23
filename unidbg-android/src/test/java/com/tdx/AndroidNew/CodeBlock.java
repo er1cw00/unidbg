@@ -101,17 +101,34 @@ public class CodeBlock {
             return CodeBlockType.USED;
         } else if (last.getMnemonic().equals("bl") || last.getMnemonic().equals("ret")) {
             return CodeBlockType.USED;
-        } else if (jmpCmds.contains(last.getMnemonic()) && (len == 2 || len == 4)) {
-            Instruction last2 = instruction.get(len - 2);
-            if (last2.getMnemonic().equals("cmp")) {
-                capstone.api.arm64.Operand op = getArm64Operand(last2, 0);
-                if (op.getType() == capstone.Arm64_const.ARM64_OP_REG) {
-                    int regId = op.getValue().getReg();// int r = last2.mapToUnicornReg(regId);
-                    String regName = last2.regName(regId);
-                    if (regName.equals("w8")) {
-                        return CodeBlockType.FAKE;
+        } else if (jmpOps.contains(last.getMnemonic()) && len >= 2) {
+            boolean findCmpOp = false;
+            for (int i = len - 2; i >= 0; i--) {
+                Instruction ins = instruction.get(i);
+                String mnemonic = ins.getMnemonic();
+                if (mnemonic.equals("cmp")) {
+                    capstone.api.arm64.Operand op = getArm64Operand(ins, 0);
+                    if (op.getType() == capstone.Arm64_const.ARM64_OP_REG) {
+                        int regId = op.getValue().getReg();
+                        String regName = ins.regName(regId);
+                        if (regName.equals("w8") ||
+                                regName.equals("w9") ||
+                                regName.equals("w10") ||
+                                regName.equals("w12") ||
+                                regName.equals("w15") ||
+                                regName.equals("w26")) {
+                            findCmpOp = true;
+                        }
                     }
+                } else if (usedOps.contains(mnemonic)) {
+                    return CodeBlockType.USED;
                 }
+//                else if (!mnemonic.equals("mov") && !mnemonic.equals("movk") ) {
+//
+//                }
+            }
+            if (findCmpOp) {
+                return CodeBlockType.FAKE;
             }
         }
         return CodeBlockType.USED;
